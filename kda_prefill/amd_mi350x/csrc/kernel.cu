@@ -33,16 +33,7 @@
  *
  * Modified in 2026 by the EAT agent team (github.com/caoshiyi/EAT), starting from the vLLM kernel above:
  * relay scheduling of a sequence's chunk groups across workgroups, cost-model routing
- * between C64 / twin / V-split instances, and the build history in the tags below.
- *
- * Build tags:
- *   b60 FLGB candidate (FLGA + wait and publish in one asm block) (POLLV + all-lane flag publish) (POLLF + VALU flag compare)
- *   b59 KAP2: scalar leading kernargs for the relay kernels (kernarg preload)
- *   gen_ol (build36)
- *   gen_ql (build36): line-efficient q/k/g loads
- *   gen_vl (build36): line-efficient v loads
- *   gen_a2tw (build36): substitution tail in kda_relay_tw
- *   gen_a2 (build36): substitution tail in kda_relay
+ * between C64 / twin / V-split instances.
  */
 #define TW_OUT2 1  // build29: both halves' outputs in one pass
 
@@ -6427,13 +6418,6 @@ std::vector<int> relay_groups(const std::vector<int64_t>& nc, int H, int64_t* vs
   for (int n = 0; n < N; ++n) items += nc[n] * H;
   const RelayModel m = items > int64_t(kXcds) * kSlotsPerXcd ? RelayModel::throughput() : RelayModel::latency();
   std::vector<int> best(N, 1);
-  if (const char* e = std::getenv("KDA_RELAY_G")) {  // debugging override
-    const int g = std::atoi(e);
-    for (int n = 0; n < N; ++n) best[n] = std::max<int64_t>(1, std::min<int64_t>(g, nc[n]));
-    const char* ev = std::getenv("KDA_VSPLIT");
-    *vsmin = ev != nullptr && ev[0] == '1' ? 1 : 0;
-    return best;
-  }
   auto ladder = [&](const RelayModel& mm) {
     std::vector<int> bst(N, 1);
     double tbest = relay_time(mm, nc, bst, H);
@@ -6455,18 +6439,17 @@ std::vector<int> relay_groups(const std::vector<int64_t>& nc, int H, int64_t* vs
   };
   best = ladder(m);
   // V-split (build25): only if the doubled batch is still one dispatch round; the cost model prices both plans.
-  const char* ev = std::getenv("KDA_VSPLIT");
-  if (2 * items <= int64_t(kXcds) * kSlotsPerXcd && (ev == nullptr || ev[0] == '1')) {
+  if (2 * items <= int64_t(kXcds) * kSlotsPerXcd) {
     const RelayModel mv = RelayModel::vsplit();
     const std::vector<int> gv = ladder(mv);
-    if (ev != nullptr || relay_time(mv, nc, gv, H) < relay_time(RelayModel::latency_abs(), nc, best, H)) {
+    if (relay_time(mv, nc, gv, H) < relay_time(RelayModel::latency_abs(), nc, best, H)) {
       *vsmin = 1;
       return gv;
     }
   }
   // Per-sequence V-split plans (all G = 1), V = the sequences with >= k chunks, for every distinct k; taken only with a >= 2 % model
   // gain over the shipped pick (the all-sequence single-round plan above keeps a plain comparison).
-  if (items <= int64_t(kXcds) * kSlotsPerXcd && (ev == nullptr || ev[0] != '0')) {
+  if (items <= int64_t(kXcds) * kSlotsPerXcd) {
     double tb = relay_time(RelayModel::latency_abs(), nc, best, H) / 1.02;
     int64_t kb = 0;
     std::vector<int64_t> ks(nc.begin(), nc.end());
@@ -6511,22 +6494,19 @@ std::vector<int> relay_groups(const std::vector<int64_t>& nc, int H, int64_t* vs
 }
 
 bool relay_policy(const int64_t* cu, int N, int H) {
-  if (const char* e = std::getenv("KDA_RELAY")) return e[0] == '1';
   return true;
 }
 
-// build28: C = 32 4-wave route. KDA_R32=1 / 0 forces it on / off.
+// build28: C = 32 4-wave route (off).
 bool relay32_route(const int64_t* cu, int N, int H, const std::vector<int64_t>& nc) {
-  if (const char* e = std::getenv("KDA_R32")) return e[0] == '1';
   return false;
 }
-// build29: twin route (kda_relay_tw) on unsplit, non-V-split plans. KDA_TW=1 / 0 forces it on / off.
+// build29: twin route (kda_relay_tw) on unsplit, non-V-split plans.
 // Cost model (build29 measurements, 16x1k / 8x2k / 4x4k): the twin's 64-token item lives ~13.6 us at 2 WG/CU (stamps; icx
 // ~14.2) but its hop is ~1.7 us (two dependent C = 32 sub-steps; icx 1.26). It pays only where the batch is throughput-bound:
 // the longest chain (hops x 1.7 us + ~10 us first-item lead) must stay under 0.8 x the throughput term (items per slot x life).
 // Small batches (one dispatch round) keep icx (latency regime, SPEC template).
 bool relay_tw_route(const int64_t* cu, int N, int H, const std::vector<int64_t>& nc) {
-  if (const char* e = std::getenv("KDA_TW")) return e[0] == '1';
   int64_t items = 0, nmax = 0;
   for (int n = 0; n < N; ++n) { items += nc[n] * H; nmax = std::max<int64_t>(nmax, nc[n]); }
   const int64_t slots = int64_t(kXcds) * kSlotsPerXcd;
@@ -6650,11 +6630,9 @@ void relay_build(const int64_t* cu, int N, int H, const std::vector<int64_t>& nc
     }
     if (ok && xlen == size_t(4 * nch)) { un_len = static_cast<int32_t>(len); un_nch = static_cast<int32_t>(nch); }
   }
-  if (const char* e = std::getenv("KDA_UN")) if (e[0] == '0') un_len = 0;
   const int64_t r0 = (static_cast<int64_t>(dev.size()) + 3) / 4 * 4;
   // twm (build47): split launches get one warm slot per XCD (the last), patched below once the tail metadata is laid out.
-  const char* twe = std::getenv("KDA_TWM");
-  const size_t twm = split && (twe == nullptr || twe[0] != '0') ? 1 : 0, xw = xlen + twm;
+  const size_t twm = split ? 1 : 0, xw = xlen + twm;
   dev.resize(r0 + int64_t(kXcds) * xw * 8, 0);
   for (int x = 0; x < kXcds; ++x)
     for (size_t s = 0; s < xw; ++s) {
@@ -6674,8 +6652,8 @@ void relay_build(const int64_t* cu, int N, int H, const std::vector<int64_t>& nc
   for (const Chain& ch : chains) if (ch.g > 0) n_aff += ch.cn;
   int run = static_cast<int>(std::max<int64_t>(1, std::min<int64_t>(kCorrRun, n_aff / 512)));
   {
-    const char* fe = std::getenv("KDA_FDO");  // the plan fdo_route will take (its padded count differs by < run per chain)
-    if (split && !vsplit && (fe != nullptr ? fe[0] == '1' : double(n_aff) * 32768.0 <= kFdoCapBytes)) run = std::min(run, kCorrRunFdo);
+    // the plan fdo_route will take (its padded count differs by < run per chain)
+    if (split && !vsplit && double(n_aff) * 32768.0 <= kFdoCapBytes) run = std::min(run, kCorrRunFdo);
   }
   int ncorr = 0;
   int64_t cmax = 0;
@@ -6723,7 +6701,6 @@ void relay_build(const int64_t* cu, int N, int H, const std::vector<int64_t>& nc
     // short-chain batches with 2 items per CU (5x150, 8 sequences of 28-280), against −1…−5 % for items alone on their CU.
     bool g1 = true;
     for (int n = 0; n < N; ++n) g1 = g1 && G[n] == 1;
-    const char* e = std::getenv("KDA_IC");
     // icx (build26): past one item per CU (up to 1.5 per CU on average), take IC only when the V-split model calls the batch clearly
     // chain-bound (chain >= 1.4 x throughput term): the dry pass then overlaps the chain's waits, while in prologue / throughput-
     // bound batches it competes with the co-resident item (5x150 and 8-9 short sequences +1.5…2 %; single sequences of 9-13
@@ -6739,7 +6716,7 @@ void relay_build(const int64_t* cu, int N, int H, const std::vector<int64_t>& nc
       const double chain = mv.pro_lone + double(lv - 1) * mv.hop, tp = mv.ramp + double(items) * mv.slot;
       icx = chain >= 1.4 * tp;
     }
-    host.push_back(vsplit && g1 && (xlen <= size_t(kSlotsPerXcd / 2) || icx) && (e == nullptr || e[0] != '0') ? 1 : 0);  // [18] icw (build26)
+    host.push_back(vsplit && g1 && (xlen <= size_t(kSlotsPerXcd / 2) || icx) ? 1 : 0);  // [18] icw (build26)
   }
   host.push_back(r32 ? 1 : tw ? 2 : 0);  // [19] build28: C = 32 4-wave relay (1); build29: twin (2)
   // [20] build39 ft: group index of every segment (the correction composes S_in from its plane's group ends)
@@ -6815,12 +6792,10 @@ void kda_build_meta(const int64_t* cu, int32_t N, int32_t H, std::vector<int32_t
 // dispatch round and (b) the longest repeated chain, G - 2 steps of kFtStep, is shorter than what it removes: the scan
 // kernel (G steps of kFtScanStep) plus one kernel boundary (kFtGap). kFtStep: measured in-workgroup step (abm, 1x1k / 1x1088 with
 // and without the step: 1.6-2.0 us; the step is LDS-bound, every wave reads all of C_g); kFtScanStep / kFtGap: PROBE39 stamps
-// (scan 2.2 us at G = 3, relay -> scan gap 1.9-2.6 us). Without (a), 1x4k (624 run-1 workgroups) ran 1.2x. KDA_FT=0 / 1 forces it.
+// (scan 2.2 us at G = 3, relay -> scan gap 1.9-2.6 us). Without (a), 1x4k (624 run-1 workgroups) ran 1.2x.
 int ft_route(const int32_t* hmeta, int NH) {
   const int g = hmeta[14];
   if (g < 2 || g > kFtMaxG) return 0;
-  const char* e = std::getenv("KDA_FT");
-  if (e != nullptr) return e[0] == '1' ? g : 0;
   return ft_fits(NH, hmeta[11], g) ? g : 0;
 }
 
@@ -6831,10 +6806,8 @@ int ft_route(const int32_t* hmeta, int NH) {
 // correction) forced fdo vs off under the eval protocol (scr68a, ab59 30 cells, own batches): 165 MiB 0.979, 231 MiB
 // [40000, 25000] 0.995, 240 MiB 0.980, 270 MiB [3 x 30000] 0.985, 384 MiB [2 x 49152] 0.990, 405 MiB 0.988, 480 MiB 0.988,
 // 495 MiB [100000, 8000] 0.995, 645 MiB 0.998 (gain falling with size, crossover ~ 700 MiB) -> cap at 2 x MALL; build68 CR4 / CRX: with the fdo run cap 4 the crossover moves past 1.2 GiB -> kFdoCapBytes (4 x MALL).
-// KDA_FDO=1 / 0 forces it.
 bool fdo_route(const int32_t* hmeta) {
   if (hmeta[12] == 0 || hmeta[15] != 0) return false;  // unsplit or V-split plan
-  if (const char* e = std::getenv("KDA_FDO")) return e[0] == '1';
   const double bytes = double(hmeta[11]) * hmeta[13] * 32768.0;
   return bytes <= kFdoCapBytes;
 }
