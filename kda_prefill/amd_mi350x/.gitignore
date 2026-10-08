@@ -1,0 +1,5 @@
+build/
+data/
+sota/build/
+sota/libkda_sota.so
+__pycache__/

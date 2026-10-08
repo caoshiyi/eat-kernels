@@ -1,0 +1,6 @@
+EAT Kernels
+Copyright 2026 the EAT authors
+
+kda_prefill/amd_mi350x/csrc/kernel.cu is derived from vLLM's ROCm Kimi-K3 KDA prefill kernels, and
+kda_prefill/amd_mi350x/sota/ contains code from vLLM (https://github.com/vllm-project/vllm, commit 9521c60),
+licensed under the Apache License 2.0. Copyright contributors to the vLLM project.
