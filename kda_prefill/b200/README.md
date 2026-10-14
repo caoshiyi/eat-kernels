@@ -159,7 +159,7 @@ H % 8 != 0, few heads, source pool, checkpoints every 256, up to 256 sequences).
 ## Provenance
 
 The starting point was the first SM100-family KDA prefill kernels in FlashInfer (the CAKE team's `flashkda_*` M64 /
-M128 fused kernels, FlashInfer snapshot of Aug 13, 2026, Apache-2.0); the files derived from them keep their NVIDIA
+M128 fused kernels, FlashInfer snapshot of Aug 13, 2026, Apache-2.0); the derived kernel files keep their NVIDIA
 copyright headers (see NOTICE). An EAT supervisor-evolved agent team rewrote and extended them in two phases: phase 1
 optimized plain calls on the six Int21 workloads (37 iterations, Oct 7-10, 2026: from about 2x for the FlashInfer
 kernels to 3.48x over FlashKDA), phase 2 adapted the kernel to serving (20 iterations, Oct 10-13, 2026: 2.10x -> 2.41x

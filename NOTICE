@@ -9,6 +9,6 @@ kda_prefill/b200/csrc/w3/base/cake/, cake_cio/, cake_dual/ and cake_ppc/ (kda_m1
 launch / binding files next to them) are derived from FlashInfer's SM100 KDA prefill kernels
 (csrc/kda/flashkda_bf16_fused_m128.cu / _m64.cu, https://github.com/flashinfer-ai/flashinfer, snapshot of
 Aug 13, 2026, commit a9e03bf2), Copyright (c) 2026, NVIDIA CORPORATION, licensed under the Apache License 2.0;
-those files keep their original copyright headers.
+the kda_m128.cu / kda_m64.cu files keep the original NVIDIA copyright header.
 kda_prefill/b200/cupti_timer.py is adapted from FlashInfer (flashinfer-python 0.6.13,
 flashinfer/testing/utils.py), Copyright (c) 2023 by FlashInfer team, licensed under the Apache License 2.0.
