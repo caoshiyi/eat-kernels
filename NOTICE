@@ -4,3 +4,11 @@ Copyright 2026 the EAT authors
 kda_prefill/amd_mi350x/csrc/kernel.cu is derived from vLLM's ROCm Kimi-K3 KDA prefill kernels, and
 kda_prefill/amd_mi350x/sota/ contains code from vLLM (https://github.com/vllm-project/vllm, commit 9521c60),
 licensed under the Apache License 2.0. Copyright contributors to the vLLM project.
+
+kda_prefill/b200/csrc/w3/base/cake/, cake_cio/, cake_dual/ and cake_ppc/ (kda_m128.cu, kda_m64.cu and the
+launch / binding files next to them) are derived from FlashInfer's SM100 KDA prefill kernels
+(csrc/kda/flashkda_bf16_fused_m128.cu / _m64.cu, https://github.com/flashinfer-ai/flashinfer, snapshot of
+Aug 13, 2026, commit a9e03bf2), Copyright (c) 2026, NVIDIA CORPORATION, licensed under the Apache License 2.0;
+those files keep their original copyright headers.
+kda_prefill/b200/cupti_timer.py is adapted from FlashInfer (flashinfer-python 0.6.13,
+flashinfer/testing/utils.py), Copyright (c) 2023 by FlashInfer team, licensed under the Apache License 2.0.
