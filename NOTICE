@@ -1,0 +1,47 @@
+KDA kernels for Kimi-K3 serving on AMD Instinct MI350X
+Copyright 2026 the authors (see README.md, "Provenance")
+
+This product is licensed under the Apache License, Version 2.0 (LICENSE), except for the third-party files listed below,
+which keep their original licenses and copyright headers.
+
+-------------------------------------------------------------------------------------------------------------------------
+vLLM (Apache License 2.0) - https://github.com/vllm-project/vllm
+SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+
+  Derived from vLLM (kernel source modified; header kept):
+    kda/prefill/kernel.cu                                       (starts from vLLM's ROCm Kimi-K3 fused KDA chunk kernel)
+  Copied from vLLM for use as benchmark baselines / contract reference (unmodified unless noted):
+    benchmark/baselines/prefill/fused_kda_chunk_kernel_rocm.cu  (vLLM 9521c60, csrc/libtorch_stable/kimi_k3/)
+    benchmark/baselines/prefill/vllm_reference/kda_chunk.py     (vLLM 9521c60, Python side of the fused prefill)
+    benchmark/baselines/prefill/vllm_reference/kda_prefill.py   (vLLM 9521c60)
+    benchmark/baselines/decode/vllm_hip/fused_kda_decode_kernel_rocm.cu (vLLM 0f112d1, csrc/libtorch_stable/kimi_k3/)
+    benchmark/vllm_reference/kda.py                             (vLLM ROCm Kimi-K3 KDA layer: the production calling convention)
+    benchmark/vllm_reference/kda_decode.py                      (vLLM ROCm Kimi-K3 fused decode entry points)
+  Written for this repository after vLLM's sources (schemas / helpers copied from vLLM):
+    benchmark/baselines/prefill/bindings.cpp, benchmark/baselines/decode/vllm_hip/bindings.cpp
+                                                                (op schemas from vllm/csrc/libtorch_stable/torch_bindings.cpp)
+    benchmark/baselines/prefill/torch_utils.h, benchmark/baselines/decode/vllm_hip/torch_utils.h
+                                                                (HIP port of vllm/csrc/libtorch_stable/torch_utils.h)
+    benchmark/baselines/sota_prod.py                            (follows vllm_reference/kda_chunk.py)
+
+-------------------------------------------------------------------------------------------------------------------------
+AITER (MIT License) - https://github.com/ROCm/aiter
+Copyright (C) 2024-2026, Advanced Micro Devices, Inc. All rights reserved.
+License text: LICENSES/MIT-AITER.txt
+
+  Derived from AITER fused_kda_decode (used by the package as the decode fallback path):
+    kda/decode/kernel_aiter_fallback.py
+    kda/decode/kernel_triton.py
+  Copied from AITER ae984f5 with the gfx950 speculative path of ROCm/aiter#5709, as the decode baseline:
+    benchmark/baselines/decode/aiter/fused_kda_decode.py
+    benchmark/baselines/decode/aiter/fused_conv_recurrent_norm.py
+
+-------------------------------------------------------------------------------------------------------------------------
+flash-linear-attention (MIT License) - https://github.com/fla-org/flash-linear-attention
+  Not vendored. benchmark/baselines/sota_prod.py imports fla.ops.utils.index (pip package flash-linear-attention 0.5.2).
+
+-------------------------------------------------------------------------------------------------------------------------
+Workload data
+  workloads/agentx_lengths.npz: per-request uncached / cached token counts derived from the AgentX v1.0 256k traces
+  (Hugging Face dataset semianalysisai/cc-traces-weka-062126-256k); see workloads/gen_prefill_batches.py. Subject to
+  the dataset's own terms.

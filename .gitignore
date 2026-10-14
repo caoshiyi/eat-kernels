@@ -1,0 +1,11 @@
+# JIT / baseline build outputs (created next to the sources at first use)
+build/
+*.so
+*.o
+*.hsaco
+*.hip
+lock
+__pycache__/
+*.pyc
+# eval caches (phase-1 reference outputs, co-tenant hog build)
+benchmark/.cache/
