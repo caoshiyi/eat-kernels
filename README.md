@@ -118,6 +118,6 @@ simplified interfaces (`amd_kda_mi350x` prefill, `amd_kda_decode_mi350x` decode)
 convention (this package). `kda/prefill/kernel.cu` started from vLLM's fused ROCm Kimi-K3 chunk kernel (its header is
 kept); the decode fallback is AITER's `fused_kda_decode`. Every number in this repository was measured on that machine.
 The source comments in `kda/` were written during that work and refer to internal notes and experiments not included
-here. Contact: `<contact placeholder>`.
+here. Contact: Shiyi Cao (shicao@berkeley.edu).
 
 License: Apache-2.0 (`LICENSE`). Third-party code (vLLM, Apache-2.0; AITER, MIT) keeps its headers; see `NOTICE`.
