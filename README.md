@@ -26,7 +26,10 @@ decode / speculative-verify steps; baselines timed live on the same inputs; all 
 | decode, geomean vs the faster of AITER `fused_kda_decode` / vLLM's HIP decode | **1.69x** (1.684–1.699) | 1.678–1.699 |
 | `mean_vs_base` = sqrt(prefill × decode) | **2.267** (2.263–2.271) | 2.261–2.275 |
 
-Gates over 40 new seeds (a full eval each): 0 failures. Per-workload ratios range from 2.2x to 5.0x (prefill) and from
+Gates over 40 new seeds (a full eval each): 0 failures. On real activations (Kimi-Linear-48B on GSM8K / MATH-500, H = 12 / 64 / 96,
+single long requests and 32-request batches, prefill with checkpoints and a carried state, plain and speculative decode)
+both operators pass a correctness gate against fp64: 27 / 27 cases, prefill output within 0.17–0.28 % relative L2
+(FLA `chunk_kda` on the same inputs: 0.23–0.35 %) (`benchmark/real_gate/`). Per-workload ratios range from 2.2x to 5.0x (prefill) and from
 1.07x (plain decode, H 12 B 64) to 2.1x (speculative B = 1) (`docs/HANDOVER.md`, section 9). A release check from a
 fresh clone of this repository read 2.224–2.259 (prefill 3.02–3.03, decode 1.64–1.69) on a day when the live AITER
 baseline ran faster on some workloads; the package's own latencies matched the handover's (`benchmark/README.md`).
@@ -107,7 +110,7 @@ definitions: `workloads/README.md`.
 | `kda/` | the package as shipped: `kernel.py` (entry points), `prefill/` (HIP C++), `decode/` (HIP C++ + Python launchers, AITER Triton fallback; `decode/FINAL.md` = the decode kernel's design notes) |
 | `reference.py` | math reference (`kda_prefill_reference`, `kda_decode_reference`) |
 | `CONTRACT.md` | calling convention, shapes, dtypes, page layout, workloads, hard gates |
-| `benchmark/` | the eval, smoke test, vendored vLLM / AITER baselines, vLLM's reference layer |
+| `benchmark/` | the eval, smoke test, vendored vLLM / AITER baselines, vLLM's reference layer; `real_gate/`: correctness on real Kimi-Linear activations |
 | `workloads/` | workload tables as data, the prefill batch generator and its trace-derived lengths, recorded phase-1 baselines |
 | `docs/HANDOVER.md` | serving-engineer guide: interfaces, environment variables, limitations, what was tested, official numbers |
 

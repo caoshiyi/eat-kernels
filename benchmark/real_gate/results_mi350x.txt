@@ -1,0 +1,31 @@
+PREFILL real workload (vs fp64)                            verdict
+kimi-linear_math500-multi-8192_L0-14-25                    PASS  T=8183 H=96 N=1  relL2 out 0.0017 state 0.0016 (FLA 0.0024 / 0.0022), ckpt relL2 0.0013 (1 rows), worst elem 0.16/0.35, health True, untouched True, 5.5 ms
+kimi-linear_math500-multi-8192_L0-14-25_h12                PASS  T=8183 H=12 N=1  relL2 out 0.0027 state 0.0011 (FLA 0.0023 / 0.0017), ckpt relL2 0.0010 (1 rows), worst elem 0.17/0.12, health True, untouched True, 0.3 ms
+kimi-linear_math500-multi-8192_L5-10-18                    PASS  T=8183 H=96 N=1  relL2 out 0.0019 state 0.0013 (FLA 0.0030 / 0.0013), ckpt relL2 0.0011 (1 rows), worst elem 0.26/0.29, health True, untouched True, 0.5 ms
+kimi-linear_math500-multi-4096_L0-14-25                    PASS  T=4094 H=96 N=1  relL2 out 0.0018 state 0.0009 (FLA 0.0026 / 0.0023), ckpt relL2 0.0008 (1 rows), worst elem 0.17/0.17, health True, untouched True, 0.3 ms
+kimi-linear_math500-multi-4096_L0-14-25_h12                PASS  T=4094 H=12 N=1  relL2 out 0.0025 state 0.0010 (FLA 0.0023 / 0.0016), ckpt relL2 0.0010 (1 rows), worst elem 0.19/0.08, health True, untouched True, 0.2 ms
+kimi-linear_math500-multi-4096_L5-10-18                    PASS  T=4094 H=96 N=1  relL2 out 0.0019 state 0.0007 (FLA 0.0030 / 0.0015), ckpt relL2 0.0007 (1 rows), worst elem 0.21/0.13, health True, untouched True, 0.3 ms
+kimi-linear_gsm8k-8shot_L0-14-25                           PASS  T=1595 H=96 N=1  relL2 out 0.0019 state 0.0007 (FLA 0.0031 / 0.0025), ckpt relL2 0.0006 (1 rows), worst elem 0.19/0.11, health True, untouched True, 0.2 ms
+kimi-linear_gsm8k-8shot_L0-14-25_h12                       PASS  T=1595 H=12 N=1  relL2 out 0.0028 state 0.0006 (FLA 0.0031 / 0.0019), ckpt relL2 0.0006 (1 rows), worst elem 0.18/0.07, health True, untouched True, 0.2 ms
+kimi-linear_gsm8k-8shot_L5-10-18                           PASS  T=1595 H=96 N=1  relL2 out 0.0019 state 0.0005 (FLA 0.0031 / 0.0019), ckpt relL2 0.0006 (1 rows), worst elem 0.21/0.07, health True, untouched True, 0.3 ms
+kimi-linear_math500-batch32_L0-14-25                       PASS  T=3703 H=96 N=32  relL2 out 0.0020 state 0.0005 (FLA 0.0032 / 0.0028), ckpt relL2 0.0005 (25 rows), worst elem 0.27/0.35, health True, untouched True, 0.4 ms
+kimi-linear_math500-batch32_L0-14-25_h12                   PASS  T=3703 H=12 N=32  relL2 out 0.0019 state 0.0006 (FLA 0.0035 / 0.0027), ckpt relL2 0.0006 (25 rows), worst elem 0.11/0.21, health True, untouched True, 0.2 ms
+kimi-linear_math500-batch32_L5-10-18                       PASS  T=3703 H=96 N=32  relL2 out 0.0019 state 0.0004 (FLA 0.0031 / 0.0023), ckpt relL2 0.0004 (25 rows), worst elem 0.23/0.17, health True, untouched True, 0.4 ms
+kimi-linear_gsm8k-batch32_L0-14-25                         PASS  T=3254 H=96 N=32  relL2 out 0.0020 state 0.0005 (FLA 0.0034 / 0.0029), ckpt relL2 0.0005 (31 rows), worst elem 0.26/0.32, health True, untouched True, 0.5 ms
+kimi-linear_gsm8k-batch32_L0-14-25_h12                     PASS  T=3254 H=12 N=32  relL2 out 0.0020 state 0.0005 (FLA 0.0035 / 0.0028), ckpt relL2 0.0006 (31 rows), worst elem 0.10/0.20, health True, untouched True, 0.2 ms
+kimi-linear_gsm8k-batch32_L5-10-18                         PASS  T=3254 H=96 N=32  relL2 out 0.0020 state 0.0004 (FLA 0.0030 / 0.0024), ckpt relL2 0.0004 (31 rows), worst elem 0.22/0.12, health True, untouched True, 0.5 ms
+kimi-linear_math500-multi-8192_L10-18                      PASS  T=8183 H=64 N=1  relL2 out 0.0020 state 0.0014 (FLA 0.0031 / 0.0015), ckpt relL2 0.0012 (1 rows), worst elem 0.26/0.30, health True, untouched True, 0.4 ms
+kimi-linear_gsm8k-batch32_L0-25                            PASS  T=3254 H=64 N=32  relL2 out 0.0020 state 0.0005 (FLA 0.0034 / 0.0029), ckpt relL2 0.0005 (31 rows), worst elem 0.25/0.32, health True, untouched True, 0.3 ms
+kimi-linear_math500-multi-8192_L0-14-25_state@4096         PASS  T=4087 H=96 N=1  relL2 out 0.0017 state 0.0013 (FLA 0.0024 / 0.0020), ckpt relL2 0.0011 (1 rows), worst elem 0.16/0.27, health True, untouched True, 0.3 ms
+kimi-linear_math500-multi-8192_L0-14-25_state@4096_h12     PASS  T=4087 H=12 N=1  relL2 out 0.0024 state 0.0008 (FLA 0.0023 / 0.0012), ckpt relL2 0.0008 (1 rows), worst elem 0.18/0.12, health True, untouched True, 0.2 ms
+
+DECODE real workload (vs fp64)                             verdict
+kimi-linear_gsm8k-batch32_L0-14-25_h96_plain               PASS  H=96 B=32 S=1 calls=16  worst relL2 out 0.0017 state 3.01e-06 (fp32 reference.py out 0.0017), accepted 1.0/call, conv cache exact, health True
+kimi-linear_gsm8k-batch32_L0-14-25_h96_spec8               PASS  H=96 B=32 S=8 calls=5  worst relL2 out 0.0017 state 3.00e-06 (fp32 reference.py out 0.0017), accepted 4.7/call, conv cache exact, health True
+kimi-linear_gsm8k-batch32_L0-14-25_h12_plain               PASS  H=12 B=32 S=1 calls=16  worst relL2 out 0.0018 state 2.12e-06 (fp32 reference.py out 0.0017), accepted 1.0/call, conv cache exact, health True
+kimi-linear_gsm8k-batch32_L0-14-25_h12_spec8               PASS  H=12 B=32 S=8 calls=5  worst relL2 out 0.0017 state 2.28e-06 (fp32 reference.py out 0.0016), accepted 4.3/call, conv cache exact, health True
+kimi-linear_math500-batch32_L0-14-25_h96_plain             PASS  H=96 B=32 S=1 calls=16  worst relL2 out 0.0017 state 2.97e-06 (fp32 reference.py out 0.0017), accepted 1.0/call, conv cache exact, health True
+kimi-linear_math500-batch32_L0-14-25_h96_spec8             PASS  H=96 B=32 S=8 calls=5  worst relL2 out 0.0017 state 2.67e-06 (fp32 reference.py out 0.0016), accepted 4.5/call, conv cache exact, health True
+kimi-linear_math500-batch32_L0-14-25_h12_plain             PASS  H=12 B=32 S=1 calls=16  worst relL2 out 0.0018 state 2.02e-06 (fp32 reference.py out 0.0018), accepted 1.0/call, conv cache exact, health True
+kimi-linear_math500-batch32_L0-14-25_h12_spec8             PASS  H=12 B=32 S=8 calls=5  worst relL2 out 0.0017 state 2.03e-06 (fp32 reference.py out 0.0017), accepted 4.3/call, conv cache exact, health True
+REAL-WORKLOAD GATE: 27 / 27 PASS (prefill 19 / 19, decode 8 / 8)
