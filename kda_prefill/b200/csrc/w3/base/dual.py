@@ -21,8 +21,18 @@ _ext_phl = None
 _ext_phl_no = None
 
 
-def _module(ck=False, dyn_exit=False, ck_dev=False, phl=False, noout=False):
-    global _ext, _ext_ck, _ext_dx, _ext_kd, _ext_phl, _ext_phl_no
+_ext_np = None
+
+
+def _module(ck=False, dyn_exit=False, ck_dev=False, phl=False, noout=False, nopart=False):
+    global _ext, _ext_ck, _ext_dx, _ext_kd, _ext_phl, _ext_phl_no, _ext_np
+    if nopart and not (ck or dyn_exit or ck_dev or phl or noout):   # [nopart] every sequence length a multiple of 32 (host-checked): kernel without the partial-chunk machinery
+        if _ext_np is None:
+            spec = importlib.util.spec_from_file_location("kda_dual_build_np", os.path.join(_HERE, "cake_dual", "build.py"))
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            _ext_np = mod.build(nopart=True)
+        return _ext_np
     if phl and noout:   # [replay] checkpoint mode: the replay launch recomputes every tail output, so the dual launch skips its output path (out / Qt MMAs and stores): only S_loc and P are produced
         if _ext_phl_no is None:
             spec = importlib.util.spec_from_file_location("kda_dual_build_phl_no", os.path.join(_HERE, "cake_dual", "build.py"))
@@ -78,16 +88,17 @@ def lpt_lists(costs, n):
     return [l for l in lists if l]
 
 
-def prepare(q, k, v, g, beta, A_log, dt_bias, scale, s0L, s0T, outL, outT, fsL, fsT, n_ctas, l_zero=False, t_eye=False, pieces=None, piece_cost=(1.40, 6.4), ck=None):
+def prepare(q, k, v, g, beta, A_log, dt_bias, scale, s0L, s0T, outL, outT, fsL, fsT, n_ctas, l_zero=False, t_eye=False, pieces=None, piece_cost=(1.40, 6.4), ck=None, nopart=False):
     """q..beta: [1, T, H, 128] (one sequence); s0L/s0T/fsL/fsT: [1, H, 128, 128] fp32; outL/outT: [1, T, H, 128] bf16.
     l_zero / t_eye: the caller guarantees s0L == 0 / s0T == I (CP tail): the kernel then writes them into TMEM instead of loading.
     ck [contract]: (snapL, snapP, ck_n_chunks, ck_base_chunk, ck_k0): chain snapshots at the global chunk boundaries b (b % ck_n == 0, local chunk > 0), row b / ck_n - ck_k0."""
     B, T, H, D = q.shape
     assert B == 1 and D == 128
     dev = q.device
-    ext = _module(ck is not None)
     if pieces is None:
         pieces = [T]
+    nopart = bool(nopart) and ck is None and T % 32 == 0   # [nopart] the dual's single sequence is the CP tail: its length must be a multiple of 32
+    ext = _module(ck is not None, nopart=nopart)
     offs = [0]
     for c in pieces[:-1]:
         offs.append(offs[-1] + 32 * c)

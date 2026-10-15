@@ -684,7 +684,7 @@ def _prepare_impl(q, k, v, g, beta, A_log, dt_bias, scale, initial_state, cu_seq
         plan = cp_plan(seq_lens, H, n_sms, ck_n)
     if plan is None:
         if fx is None:
-            return _base.prepare(q, k, v, g, beta, A_log, dt_bias, scale, initial_state, cu_seqlens, **({"n_sms": n_sms, "out": out, "final_state": final_state} if out is not None else {}))
+            return _base.prepare(q, k, v, g, beta, A_log, dt_bias, scale, initial_state, cu_seqlens, nopart=True, **({"n_sms": n_sms, "out": out, "final_state": final_state} if out is not None else {}))
         return _base.prepare(q, k, v, g, beta, A_log, dt_bias, scale, fx["src"][0], cu_seqlens, final_state=fx["dst"][0] if fx["dst"][0] is not None else None,
                              feat={"src": fx["src"][1:], "dst": fx["dst"][1:], "ck": fx["ck"]})
     j, xl, n_P, n_S, n_B, pieces, p_first = plan
@@ -740,13 +740,13 @@ def _prepare_impl(q, k, v, g, beta, A_log, dt_bias, scale, initial_state, cu_seq
               "ck": (ck[0], ck[1][j + 1:], ck[2]) if ck else None}
         sl_src = (lambda a, b: s_t) if s_idx is not None else (lambda a, b: s_t[a:b])   # no slot table: sequence n = row n, so a sub-launch needs the row-sliced view
     LP = _base.prepare(hd(q), hd(k), hd(v), hd(g), hd(beta), A_log, dt_bias, scale, sl_src(0, j + 1),
-                       i64(cl[:j + 1] + [x]) if j > 0 else None, out=hd(out), final_state=sA, n_sms=n_P, feat=fP)
+                       i64(cl[:j + 1] + [x]) if j > 0 else None, out=hd(out), final_state=sA, n_sms=n_P, feat=fP, nopart=(fx is None))
     LS = None
     suffix_empty = j + 1 < N and cl[N] == e                 # only zero-length sequences after j: final state = initial state
     if j + 1 < N and not suffix_empty:
         LS = _base.prepare(sf(q), sf(k), sf(v), sf(g), sf(beta), A_log, dt_bias, scale, sl_src(j + 1, N),
                            i64([c - e for c in cl[j + 1:]]) if (N - j - 1 > 1 or cl[N] != T) else None, out=sf(out),
-                           final_state=final_state if (fx is not None and pool_dst) else final_state[j + 1:], n_sms=n_S, feat=fS)
+                           final_state=final_state if (fx is not None and pool_dst) else final_state[j + 1:], n_sms=n_S, feat=fS, nopart=(fx is None))
     # [contract] checkpoints inside the tail: boundary chunk b = k * ck_n of the sequence, k0 <= k <= kmax.  b == xc is the head state S_A and a piece start is the
     # chained S_in(p): plain copies after the fixup; every other boundary is a snapshot (S_loc, P) of the dual launch composed by a fixup item.
     snap_items, copy_sA, copy_sin, snapL, snapP, cki_t = [], [], [], None, None, None
@@ -774,13 +774,13 @@ def _prepare_impl(q, k, v, g, beta, A_log, dt_bias, scale, initial_state, cu_seq
     if n_B < 0:   # [architect4] dual-chain tail: L (v, S0 = 0) and Tr (v = 0, S0 = I) share one prep in one launch on -n_B CTAs
         LL = _dual.prepare(tl(q), tl(k), tl(v), tl(g), tl(beta), A_log, dt_bias, scale, s0z, eye, tl(out), qt, sL, sP, -n_B,
                            l_zero=True, t_eye=True, pieces=pieces, piece_cost=(_DUAL_F, _DUAL_TASK),
-                           ck=(snapL, snapP, ck_n, xc, k0) if snap_items else None)
+                           ck=(snapL, snapP, ck_n, xc, k0) if snap_items else None, nopart=(fx is None))
         LT = None
     else:
         LL = _base.prepare(tl(q), tl(k), tl(v), tl(g), tl(beta), A_log, dt_bias, scale, s0z, None,
-                           out=tl(out), final_state=sL, n_sms=n_B)
+                           out=tl(out), final_state=sL, n_sms=n_B, nopart=(fx is None))
         LT = _base.prepare(tl(q), tl(k), vz, tl(g), tl(beta), A_log, dt_bias, scale, eye, None,
-                           out=qt, final_state=sP, n_sms=n_B)
+                           out=qt, final_state=sP, n_sms=n_B, nopart=(fx is None))
     use_fixck = (bool(snap_items) or (fx is not None and pool_dst)) and not split_fix      # [contract] the feature fixup: checkpoint items and / or the pool slot written directly (a split fixup stages the final state: sfix + slot copy)
     fix = _fixmod(use_fixck)
     fs = _fixsched()

@@ -1,8 +1,8 @@
 import os
 from torch.utils.cpp_extension import load
 _here = os.path.dirname(os.path.abspath(__file__))
-def build(verbose=False, feat=False, ck=False, dyn_exit=False, ck_dev=False, phl=False, noout=False):
-    xf = ["-DKDA_NOOUT1", "-DKDA_NOOUT2", "-DKDA_NOOUT3", "-DKDA_NOOUT4"] if noout else []
+def build(verbose=False, feat=False, ck=False, dyn_exit=False, ck_dev=False, phl=False, noout=False, nopart=False):
+    xf = (["-DKDA_NOOUT1", "-DKDA_NOOUT2", "-DKDA_NOOUT3", "-DKDA_NOOUT4"] if noout else []) + (["-DKDA_NOPART"] if nopart else [])
     xt = ("_x" + "".join(c if c.isalnum() else "_" for c in "_".join(xf))) if xf else ""
     flags = xf + ["-O3", "-gencode=arch=compute_100a,code=sm_100a", "-std=c++17", "--use_fast_math", "-lineinfo"] + (["-DKDA_CK"] if (ck or ck_dev) else []) + (["-DKDA_CK_DEV"] if ck_dev else []) + (["-DKDA_DYN_EXIT"] if (dyn_exit or ck_dev) else []) + (["-DKDA_P_HILO"] if phl else [])
     d = os.path.join(_here, ("build_phl" if phl else ("build_ck" if ck else ("build_ckdev" if ck_dev else ("build_dynexit" if dyn_exit else "build")))) + xt)

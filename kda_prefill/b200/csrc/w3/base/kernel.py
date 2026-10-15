@@ -44,11 +44,13 @@ def ck_bf16():
     return bool(getattr(_tls, "bf", False))
 
 
-def _build_dir(sub, name, feat, ck=False, bd=False, rw=False):
+def _build_dir(sub, name, feat, ck=False, bd=False, rw=False, nopart=False):
     import importlib.util
     spec = importlib.util.spec_from_file_location(name, os.path.join(_HERE, sub, "build.py"))
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
+    if nopart:
+        return mod.build(nopart=True)
     bf = {"bf": True} if (feat and ck and ck_bf16()) else {}   # [bf16ckpt]
     return mod.build(feat=True, ck=ck, bd=True, **bf) if (feat and bd) else mod.build(feat=True, ck=ck, rw=True, **bf) if (feat and rw) else mod.build(feat=True, ck=ck, **bf) if feat else (mod.build(bd=True) if bd else mod.build())
 
@@ -62,10 +64,17 @@ def _feat_module(kind, sub, ck, rw=False, bd=False):
     return _feat[key]
 
 
-def _module_cio(feat=False, ck=False):
-    global _ext_cio
+_ext_cio_np = None
+
+
+def _module_cio(feat=False, ck=False, nopart=False):
+    global _ext_cio, _ext_cio_np
     if feat:
         return _feat_module("cio", "cake_cio", ck)
+    if nopart:   # [nopart] every sequence length a multiple of 32 (host-checked): kernel without the partial-chunk machinery
+        if _ext_cio_np is None:
+            _ext_cio_np = _build_dir("cake_cio", "kda_cio_np_build", False, nopart=True)
+        return _ext_cio_np
     if _ext_cio is None:
         _ext_cio = _build_dir("cake_cio", "kda_cio_build", False)
     return _ext_cio
@@ -246,10 +255,17 @@ def tiny_dyn_prepare(q, k, v, g, beta, A_log, dt_bias, scale, initial_state, cu,
     return launch
 
 
-def _module(feat=False, ck=False, rw=False, bd=False):
-    global _ext
+_ext_np = None
+
+
+def _module(feat=False, ck=False, rw=False, bd=False, nopart=False):
+    global _ext, _ext_np
     if feat:
         return _feat_module("plain", "cake", ck, rw, bd)
+    if nopart:   # [nopart] see _module_cio
+        if _ext_np is None:
+            _ext_np = _build_dir("cake", "kda_plain_np_build", False, nopart=True)
+        return _ext_np
     if _ext is None:
         _ext = _build_dir("cake", "kda_plain_build", False)
     return _ext
@@ -593,7 +609,7 @@ def plain_pieces(seq_lens, H, sched):
     return None
 
 
-def prepare(q, k, v, g, beta, A_log, dt_bias, scale, initial_state, cu_seqlens=None, out=None, final_state=None, n_sms=None, feat=None, dynamic=False, val=None):
+def prepare(q, k, v, g, beta, A_log, dt_bias, scale, initial_state, cu_seqlens=None, out=None, final_state=None, n_sms=None, feat=None, dynamic=False, val=None, nopart=False):
     """out / final_state: optional caller-owned output buffers (shapes of q / [N, H, D, D]); n_sms: SM budget for the plan (CP groups).
     feat [contract]: None (the v44 kernels: sequence n at row n of contiguous [N, H, D, D] state buffers), or a dict that selects the KDA_FEAT kernels
       {"src": (idx int32 [N] | None, slot_stride), "dst": (idx | None, slot_stride), "ck": (buffer, ck_cu int64 [N+1], n // 32) | None}:
@@ -623,7 +639,8 @@ def prepare(q, k, v, g, beta, A_log, dt_bias, scale, initial_state, cu_seqlens=N
         val = feat.get("val") if feat is not None else None   # [contract2] dynamic path: table-validation arguments (contract_aux.cu / validate_dev.cuh), run by the planner launch
     pk = {"val": val} if val else {}
     cu_k = val["cu_out"] if val and val["cu_out"] is not None else cu   # the kernels read the sanitized cu_seqlens when the planner produced one
-    ext = _module(feat is not None, use_ck)
+    nopart = bool(nopart) and feat is None and not dynamic and all(l % 32 == 0 for l in seq_lens)   # [nopart] re-checked here: only a launch whose sequences all have full chunks may use the kernels without the partial-chunk machinery
+    ext = _module(feat is not None, use_ck, nopart=nopart)
     dyn_plain = ident = False
     if dynamic:   # [planner_graph] device-planned launch (cio with pieces, or plain for short tasks): the task tables are produced on the GPU from cu_seqlens inside the graph
         dyn_plain = _dyn_use_plain(T, N, H, n_sms if n_sms is not None else _num_sms(dev))
@@ -706,7 +723,7 @@ def prepare(q, k, v, g, beta, A_log, dt_bias, scale, initial_state, cu_seqlens=N
     sc, lb = float(scale), -5.0
 
     if use_cio:
-        cio = _module_cio(feat is not None, use_ck)
+        cio = _module_cio(feat is not None, use_ck, nopart=nopart)
         if dynamic:
             ncta = max(1, min(n_sms if n_sms is not None else _num_sms(dev), N * H))
             dplan = _dev_planner(dev.index if dev.index is not None else torch.cuda.current_device())

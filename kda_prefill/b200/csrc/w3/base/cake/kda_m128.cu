@@ -5,7 +5,13 @@
 // [audit P1] v_full arrival count: the load warp arrives on v_full for EVERY chunk (a full chunk: arrive_expect_tx + this arrive, the TMA completes the tx; a partial chunk, whose v tile is produced by kda_tail_v: this arrive + the tail's arrive),
 // so that no stage can complete a lap (= the MMA / compute consume the chunk) without the load warp having passed its v_free / qk_full waits.  Without it a late load warp is >= 2 phases behind on v_free[s] / qk_full[s]
 // (parity aliasing) and sleeps for ever.
+// [nopart] KDA_NOPART flavor (host-checked precondition: every sequence length of the launch is a multiple of 32, so no partial
+// last chunk exists): the partial-chunk machinery is compiled out, and v_full takes only the tx-armed arrival.
+#ifdef KDA_NOPART
+#define VF_CNT 1
+#else
 #define VF_CNT 2
+#endif
 #define AUD_ROLE(r) do {} while (0)
 /*
  * Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
@@ -931,7 +937,9 @@ kernel_flashkda_bf16_fused_m128(__nv_bfloat16* __restrict__ q, const void* __res
         const uint32_t w = (n == k ? 0xBF80u : 0u) | (n == k + 1 ? 0xBF800000u : 0u);
         *reinterpret_cast<uint32_t*>(smem_raw + SMEM_NEG_IDENT_OFF + off) = w;
     }
+#ifndef KDA_NOPART
     if (tid < 4) *reinterpret_cast<volatile int*>(smem_raw + 1008 + 4 * tid) = 0;   // [hardening] 16 zero bytes (raw k rows past the sequence end are read from here)
+#endif
     if (tid == 0) asm volatile("mbarrier.init.shared::cta.b64 [%0], %1;" :: "r"((uint32_t)smem + KDA_WD_DONE_OFF), "r"(KDA_WD_PRODUCERS));   // [speed] producers-finished barrier (load warp + prep warps; the watchdog waits for it)
     asm volatile("fence.proxy.async.shared::cta;" ::: "memory");
     volatile int* tmem_addr_storage = (volatile int*)(smem_raw + 616);
@@ -1240,7 +1248,11 @@ kernel_flashkda_bf16_fused_m128(__nv_bfloat16* __restrict__ q, const void* __res
                 if (it1 > 0) mbarrier_wait(final_ready_addr + (epilogue_stage) * 8, _phase_final_ready_1);
                 if (it1 < num_chunks_1) EPI_SCALE_NEXT(vbase + it1, it1 == 0);  // dbs: scale first
                 if (it1 == 0) continue;
+#ifdef KDA_NOPART
+                const int chunk_is_full = 1;
+#else
                 const int chunk_is_full = ((seq_len_1 >= (chunk_idx_1 + 1) * 32) ? 1 : 0);
+#endif
                 {   // [tiny] partial chunks use the same TMEM -> smem tile; only the store differs
                     float _tmem_load_4[16];
                     asm volatile(
@@ -1656,12 +1668,21 @@ kernel_flashkda_bf16_fused_m128(__nv_bfloat16* __restrict__ q, const void* __res
             long long eos_3 = cu_seqlens[seq_idx_3 + 1];
             int seq_len_3 = (int)(eos_3 - bos_3);
             int num_chunks_3 = (seq_len_3 + 32 - 1) / 32;
+#ifdef KDA_NOPART
+            if ((seq_len_3 & 31) != 0) __trap();   // [nopart] precondition violated (a partial last chunk reached a kernel without the partial-chunk isolation): fail loudly
+#endif
             #pragma unroll 1
             for (int chunk_idx_2 = 0; chunk_idx_2 < num_chunks_3; chunk_idx_2++) {
                 mbarrier_wait(v_free_addr + (load_stage) * 8, _phase_v_free);
                 mbarrier_wait(qk_full_addr + (load_stage) * 8, _phase_qk_full_2);
+#ifdef KDA_NOPART
+                const int chunk_is_full_1 = 1;
+#else
                 const int chunk_is_full_1 = ((seq_len_3 >= (chunk_idx_2 + 1) * 32) ? 1 : 0);   // [hardening] a partial last chunk of v is loaded with zero-fill by the prep warps (kda_tail_v): no TMA here
+#endif
+#ifndef KDA_NOPART
                 if (elect_sync()) mbarrier_arrive(v_full_addr + (load_stage) * 8);   // [audit P1] see VF_CNT (first: the tx-armed arrival below completes the phase once the TMA bytes landed)
+#endif
                 if (elect_sync()) {
                     if (chunk_is_full_1 != 0) {
                         mbarrier_arrive_expect_tx(v_full_addr + (load_stage) * 8, 8192);
@@ -1727,7 +1748,11 @@ kernel_flashkda_bf16_fused_m128(__nv_bfloat16* __restrict__ q, const void* __res
                 int stage_f32 = prep_stage * 10496;
                 int stage_bf16 = prep_stage * 20992;
                 int chunk_is_full_2 = 1;  // pad: partial chunks use the TMA path, padded tokens are exact no-ops
+#ifdef KDA_NOPART
+                const int chunk_valid_2 = 32;
+#else
                 const int chunk_valid_2 = min(32, seq_len_4 - chunk_idx_3 * 32);
+#endif
                 float early_beta_value = 0.0f;
                 float early_gate0 = 0.0f;
 #ifdef KDA_BETA_DIRECT   // [tiny] H % 8 != 0: beta rows are not 16 B multiples (no TMA map): read the 32 logits of the chunk directly (issued here, consumed after the gate arrives)
@@ -1967,7 +1992,13 @@ kernel_flashkda_bf16_fused_m128(__nv_bfloat16* __restrict__ q, const void* __res
                         const int segment_1 = work_item % 16;
                         uint4 qr, kr;
                         asm volatile("ld.shared.v4.b32 {%0,%1,%2,%3}, [%4];" : "=r"(qr.x), "=r"(qr.y), "=r"(qr.z), "=r"(qr.w) : "r"((smem_q_raw_prefetch_addr + prep_stage * 41984 + (unsigned int)(segment_1 * 8 / 64 * 4096 + row_1 * 128 + segment_1 * 8 % 64 * 2 ^ (segment_1 * 8 / 64 * 4096 + row_1 * 128 + segment_1 * 8 % 64 * 2 >> 7 & 7) << 4))));
-                        asm volatile("ld.shared.v4.b32 {%0,%1,%2,%3}, [%4];" : "=r"(kr.x), "=r"(kr.y), "=r"(kr.z), "=r"(kr.w) : "r"((row_1 < chunk_valid_2) ? (unsigned int)(smem_kd_addr + prep_stage * 41984 + (unsigned int)(segment_1 * 8 / 64 * 4096 + row_1 * 128 + segment_1 * 8 % 64 * 2 ^ (segment_1 * 8 / 64 * 4096 + row_1 * 128 + segment_1 * 8 % 64 * 2 >> 7 & 7) << 4)) : (unsigned int)(smem + 1008)));   // [hardening] rows past the sequence end hold the next sequence's tokens (NaN * 0): read zeros instead
+                        asm volatile("ld.shared.v4.b32 {%0,%1,%2,%3}, [%4];" : "=r"(kr.x), "=r"(kr.y), "=r"(kr.z), "=r"(kr.w) : 
+#ifdef KDA_NOPART
+"r"((unsigned int)(smem_kd_addr + prep_stage * 41984 + (unsigned int)(segment_1 * 8 / 64 * 4096 + row_1 * 128 + segment_1 * 8 % 64 * 2 ^ (segment_1 * 8 / 64 * 4096 + row_1 * 128 + segment_1 * 8 % 64 * 2 >> 7 & 7) << 4))));
+#else
+"r"((row_1 < chunk_valid_2) ? (unsigned int)(smem_kd_addr + prep_stage * 41984 + (unsigned int)(segment_1 * 8 / 64 * 4096 + row_1 * 128 + segment_1 * 8 % 64 * 2 ^ (segment_1 * 8 / 64 * 4096 + row_1 * 128 + segment_1 * 8 % 64 * 2 >> 7 & 7) << 4)) : (unsigned int)(smem + 1008)));
+#endif
+   // [hardening] rows past the sequence end hold the next sequence's tokens (NaN * 0): read zeros instead
                         const float4 pf0 = *reinterpret_cast<const float4*>(&smem_gate_all[stage_f32 + row_1 * 128 + GSW(segment_1 * 8)]);
                         const float4 pf1 = *reinterpret_cast<const float4*>(&smem_gate_all[stage_f32 + row_1 * 128 + GSW(segment_1 * 8 + 4)]);
                         float2 q2[4], k2[4];
@@ -2710,9 +2741,11 @@ kernel_flashkda_bf16_fused_m128(__nv_bfloat16* __restrict__ q, const void* __res
                 prep_iter_stamp = 1;
                 { _phase_raw_inputs_free ^= 1; _phase_gate_raw_full ^= 1; _phase_smem_free ^= 1; _phase_qk_raw_full ^= 1; _phase_prep_diag_ready ^= 1; _phase_prep_inv16_ready ^= 1; }  // advance by 5 stages = identity on prep_stage
             }
+#ifndef KDA_NOPART
             if (((seq_len_4 & 31) != 0) && (int)((vbase + num_chunks_4 - 1) % 5) == (int)prep_instance)   // [hardening] the instance that prepared the partial last chunk loads its v tile (kda_tail_v)
                 kda_tail_v(smem_v_addr + prep_stage * 41984, v, bos_4, eos_4, num_chunks_4 - 1, head_idx_3, num_heads, prep_tid, v_free_addr + (prep_stage) * 8,
                            (int)(1u ^ (((unsigned int)(vbase + num_chunks_4 - 1) / 5u) & 1u)), v_full_addr + (prep_stage) * 8, 11 + prep_instance);
+#endif
                     vbase += num_chunks_4;
             }
 }
