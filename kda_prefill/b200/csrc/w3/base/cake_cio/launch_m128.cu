@@ -4,6 +4,7 @@
 #undef __CUDA_NO_HALF2_OPERATORS__
 #undef __CUDA_NO_BFLOAT16_OPERATORS__
 #include <cuda_bf16.h>
+#include "../ck_type.cuh"
 #include <cuda_runtime.h>
 #define uint8_t g_uint8_t
 #define uint16_t g_uint16_t
@@ -12,7 +13,7 @@
 #define int32_t g_int32_t
 #define int16_t g_int16_t
 #ifdef KDA_FEAT
-#define FEAT_DECL , const int* src_idx, long long src_stride, const int* dst_idx, long long dst_stride, float* ck_base, const long long* ck_cu, int ck_n
+#define FEAT_DECL , const int* src_idx, long long src_stride, const int* dst_idx, long long dst_stride, ck_t* ck_base, const long long* ck_cu, int ck_n
 #define FEAT_ARGS , src_idx, src_stride, dst_idx, dst_stride, ck_base, ck_cu, ck_n
 #else
 #define FEAT_DECL

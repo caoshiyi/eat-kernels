@@ -542,7 +542,7 @@ __device__ __forceinline__ uint32_t make_warp_uniform(uint32_t val) {
 #include "../ck_store.cuh"   // [contract2] full-line checkpoint stores
 #endif
 #ifdef KDA_FEAT
-#define FEAT_PARAMS , const int* __restrict__ src_idx, long long src_stride, const int* __restrict__ dst_idx, long long dst_stride, float* __restrict__ ck_base, const long long* __restrict__ ck_cu, int ck_n
+#define FEAT_PARAMS , const int* __restrict__ src_idx, long long src_stride, const int* __restrict__ dst_idx, long long dst_stride, ck_t* __restrict__ ck_base, const long long* __restrict__ ck_cu, int ck_n
 #define SRC_OFF(seq, head) ((src_idx != nullptr ? (long long)__ldg(src_idx + (seq)) : (long long)(seq)) * src_stride + (long long)(head) * 16384)
 #define DST_OFF(seq, head) ((dst_idx != nullptr ? (long long)__ldg(dst_idx + (seq)) : (long long)(seq)) * dst_stride + (long long)(head) * 16384)
 #else
@@ -897,8 +897,12 @@ kernel_flashkda_bf16_fused_m64(__nv_bfloat16* __restrict__ q, const void* __rest
                             uint32_t t0r_[16], t1r_[16];
                             #pragma unroll
                             for (int i_ = 0; i_ < 16; i_++) { t0r_[i_] = __float_as_uint(ckv_[i_]); t1r_[i_] = __float_as_uint(ckv_[16 + i_]); }
+#ifdef KDA_CKBF
+                            ck_store_pair_bf16(ck_base + ck_head, t0r_, t1r_, state_row_top, ch_ * 64, lane);
+#else
                             ck_store_tile(ck_base + ck_head, t0r_, state_row_top, ch_ * 64, lane);
                             ck_store_tile(ck_base + ck_head, t1r_, state_row_top, ch_ * 64 + 32, lane);
+#endif
                         }
                     }
                 }

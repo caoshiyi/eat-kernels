@@ -9,6 +9,7 @@
 //   checkpoint_cu_starts -> a sequence whose rows [ck_cu, ck_cu + ceil(len / n)) do not fit in [0, C) gets -1; the KDA_CK kernels skip its checkpoints
 // and ORs a bit mask into `status` (stored, not accumulated: it describes the last launch): 1 bad cu_seqlens, 2 bad / repeated dst slot, 4 bad src slot, 8 bad checkpoint rows.
 // A sequence with a rejected table entry gets undefined (finite) outputs and states; every other sequence is bit-identical to a launch without the bad entry.
+#include <cuda_bf16.h>
 #include <torch/extension.h>
 #include <c10/cuda/CUDAStream.h>
 #include <c10/cuda/CUDAGuard.h>
@@ -42,15 +43,26 @@ __global__ void copy_rows_kernel(const float4* __restrict__ src, long long src_s
 
 // [dynpath2] checkpoint rows that are plain copies of a scratch state (the head state S_A / a chained piece state S_in): row ck_base[0] + rel[i] of the checkpoint buffer
 // (device-resident row: replays may change checkpoint_cu_starts; a rejected sequence has ck_base[0] < 0 and gets no copy).  item i: kind[i] < 0 -> S_A, else S_in(kind[i]).
-__global__ void copy_ck_kernel(const float4* __restrict__ sa, const float4* __restrict__ sin_, float4* __restrict__ ck, const long long* __restrict__ ck_base,
+// [bf16ckpt] BF: the checkpoint buffer is bf16 (rows rounded to nearest even)
+__device__ __forceinline__ void ck_copy_row(float4* __restrict__ d, const float4* __restrict__ s) {
+  for (int k = threadIdx.x; k < 4096; k += blockDim.x) d[k] = s[k];
+}
+__device__ __forceinline__ void ck_copy_row(__nv_bfloat16* __restrict__ d, const float4* __restrict__ s) {
+  for (int k = threadIdx.x; k < 4096; k += blockDim.x) {
+    const float4 f = s[k];
+    const __nv_bfloat162 b0 = __floats2bfloat162_rn(f.x, f.y), b1 = __floats2bfloat162_rn(f.z, f.w);
+    reinterpret_cast<uint2*>(d)[k] = make_uint2(*(const uint32_t*)&b0, *(const uint32_t*)&b1);
+  }
+}
+template <typename CK>
+__global__ void copy_ck_kernel(const float4* __restrict__ sa, const float4* __restrict__ sin_, CK* __restrict__ ck, const long long* __restrict__ ck_base,
                                const int2* __restrict__ items, int H) {
   const int i = blockIdx.x / H, h = blockIdx.x % H;
   const long long rb = ck_base[0];
   if (rb < 0) return;
   const int2 it = items[i];
   const float4* s = (it.y < 0 ? sa : sin_ + (long long)it.y * H * 4096) + (long long)h * 4096;
-  float4* d = ck + ((rb + it.x) * H + h) * 4096;
-  for (int k = threadIdx.x; k < 4096; k += blockDim.x) d[k] = s[k];
+  ck_copy_row(ck + ((rb + it.x) * H + h) * (sizeof(CK) == 16 ? 4096 : 16384), s);
 }
 // [portfolio] dst[t * Hp + h] = src[t * H + h] (bf16 beta -> its TMA-aligned padded copy): one trivial launch instead of torch's strided-copy kernel (cold-L2 graph node ~2 us vs ~3.9 us)
 __global__ void pad_copy_kernel64(const unsigned short* __restrict__ src, unsigned short* __restrict__ dst, long long n, int H, int Hp) {
@@ -117,7 +129,11 @@ void copy_ck_rows(torch::Tensor sa, torch::Tensor sin_, torch::Tensor ck, torch:
   const int n = (int)items.size(0);
   if (n <= 0) return;
   KdaDevGuard dev_guard_(sa);   // [multi-GPU] launch on the tensors' device
-  copy_ck_kernel<<<(unsigned)(n * H), 256, 0, c10::cuda::getCurrentCUDAStream()>>>((const float4*)sa.data_ptr(), sin_.numel() ? (const float4*)sin_.data_ptr() : nullptr,
+  if (ck.scalar_type() == at::kBFloat16)   // [bf16ckpt]
+    copy_ck_kernel<__nv_bfloat16><<<(unsigned)(n * H), 256, 0, c10::cuda::getCurrentCUDAStream()>>>((const float4*)sa.data_ptr(), sin_.numel() ? (const float4*)sin_.data_ptr() : nullptr,
+        (__nv_bfloat16*)ck.data_ptr(), (const long long*)ck_base.data_ptr(), (const int2*)items.data_ptr(), (int)H);
+  else
+  copy_ck_kernel<float4><<<(unsigned)(n * H), 256, 0, c10::cuda::getCurrentCUDAStream()>>>((const float4*)sa.data_ptr(), sin_.numel() ? (const float4*)sin_.data_ptr() : nullptr,
       (float4*)ck.data_ptr(), (const long long*)ck_base.data_ptr(), (const int2*)items.data_ptr(), (int)H);
   C10_CUDA_KERNEL_LAUNCH_CHECK();
 }

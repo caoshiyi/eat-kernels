@@ -638,6 +638,12 @@ __device__ __forceinline__ void sio_state_store_cg(float* __restrict__ g, uint32
         }
     }
 }
+#ifdef KDA_CKBF
+#include "../ck_store.cuh"   // [bf16ckpt] bf16 checkpoint rows: full-line 32 B stores 
+#define SIO_CK_STORE sio_state_store_fl   // inlined: measured -13% of the agent16 checkpoint cost vs the out-of-line copy
+#else
+#define SIO_CK_STORE sio_state_store_cg
+#endif
 __device__ __noinline__ void cio_scale_hi(int sa, int gq) {  // cioni: rebase-only scale of key columns 64..127
                                                             float sv[32], sw[32];
                     tmem_ld_x32(sv, sa);
@@ -665,7 +671,7 @@ __device__ __noinline__ void cio_scale_hi(int sa, int gq) {  // cioni: rebase-on
 }
 // ---- [contract] state pool / source pool / prefix-cache checkpoints (KDA_FEAT builds); see cake/kda_m128.cu ----
 #ifdef KDA_FEAT
-#define FEAT_PARAMS , const int* __restrict__ src_idx, long long src_stride, const int* __restrict__ dst_idx, long long dst_stride, float* __restrict__ ck_base, const long long* __restrict__ ck_cu, int ck_n
+#define FEAT_PARAMS , const int* __restrict__ src_idx, long long src_stride, const int* __restrict__ dst_idx, long long dst_stride, ck_t* __restrict__ ck_base, const long long* __restrict__ ck_cu, int ck_n
 #define SRC_OFF(seq, head) ((src_idx != nullptr ? (long long)__ldg(src_idx + (seq)) : (long long)(seq)) * src_stride + (long long)(head) * 16384)
 #define DST_OFF(seq, head) ((dst_idx != nullptr ? (long long)__ldg(dst_idx + (seq)) : (long long)(seq)) * dst_stride + (long long)(head) * 16384)
 #else
@@ -1068,7 +1074,7 @@ kernel_kda_m128_cio(__nv_bfloat16* __restrict__ q, const void* __restrict__ q_tm
             for (int chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++) {
 #ifdef KDA_CK
                 if (ck_n != 0 && (tc0 + chunk_idx) % ck_n == 0 && __ldg(ck_cu + tval / num_heads) >= 0)   // [contract2] negative row = rejected rows: skip; [contract] prefix-cache checkpoint: state before token 32 * (tc0 + chunk_idx) (true state: the previous chunk rebases)
-                    sio_state_store_cg(ck_base + ((__ldg(ck_cu + tval / num_heads) + (tc0 + chunk_idx) / ck_n) * (long long)num_heads + tval % num_heads) * 16384,
+                    SIO_CK_STORE(ck_base + ((__ldg(ck_cu + tval / num_heads) + (tc0 + chunk_idx) / ck_n) * (long long)num_heads + tval % num_heads) * 16384,
                                        (uint32_t)(taddr + sreg + 64), warp_in_wg, lane);
 #endif
                 mbarrier_wait(qk_full_addr + (compute_stage) * 8, _phase_qk_full);

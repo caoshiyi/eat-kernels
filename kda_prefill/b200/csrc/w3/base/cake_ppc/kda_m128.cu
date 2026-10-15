@@ -635,7 +635,7 @@ __device__ __forceinline__ void sio_state_store(float* __restrict__ g, uint32_t 
 #endif
 // ---- [contract] state pool / source pool / prefix-cache checkpoints (KDA_FEAT builds); see cake/kda_m128.cu ----
 #ifdef KDA_FEAT
-#define FEAT_PARAMS , const int* __restrict__ src_idx, long long src_stride, const int* __restrict__ dst_idx, long long dst_stride, float* __restrict__ ck_base, const long long* __restrict__ ck_cu, int ck_n
+#define FEAT_PARAMS , const int* __restrict__ src_idx, long long src_stride, const int* __restrict__ dst_idx, long long dst_stride, ck_t* __restrict__ ck_base, const long long* __restrict__ ck_cu, int ck_n
 #define SRC_OFF(seq, head) ((src_idx != nullptr ? (long long)__ldg(src_idx + (seq)) : (long long)(seq)) * src_stride + (long long)(head) * 16384)
 #define DST_OFF(seq, head) ((dst_idx != nullptr ? (long long)__ldg(dst_idx + (seq)) : (long long)(seq)) * dst_stride + (long long)(head) * 16384)
 #else

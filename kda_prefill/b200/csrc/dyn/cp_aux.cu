@@ -35,8 +35,20 @@ __global__ void scatter_state_kernel(const float4* __restrict__ sfix, float4* __
 
 // [dynpath2] checkpoint rows that are plain copies of S_A (kind < 0) or a chained piece state S_in(kind) in a device-planned CP replay: row ck_cu[j] + rel of the checkpoint buffer.
 // geom[10] = number of items (<= 2), items int2 (rel row, kind).  S_A = sa_base[idx[j]] (pool slot of the cut sequence: single-sequence head launch) or the scratch state sa.
+// [bf16ckpt] CK = float4 (fp32 rows) or __nv_bfloat16 (rows rounded to nearest even)
+__device__ __forceinline__ void ck_copy_row(float4* __restrict__ d, const float4* __restrict__ s) {
+  for (int k = threadIdx.x; k < 4096; k += blockDim.x) d[k] = s[k];
+}
+__device__ __forceinline__ void ck_copy_row(__nv_bfloat16* __restrict__ d, const float4* __restrict__ s) {
+  for (int k = threadIdx.x; k < 4096; k += blockDim.x) {
+    const float4 f = s[k];
+    const __nv_bfloat162 b0 = __floats2bfloat162_rn(f.x, f.y), b1 = __floats2bfloat162_rn(f.z, f.w);
+    reinterpret_cast<uint2*>(d)[k] = make_uint2(*(const uint32_t*)&b0, *(const uint32_t*)&b1);
+  }
+}
+template <typename CK>
 __global__ void copy_ck_dyn_kernel(const float4* __restrict__ sa, const float4* __restrict__ sa_base, const int* __restrict__ d_idx, long long d_stride, const float4* __restrict__ sin_,
-                                   float4* __restrict__ ck, const long long* __restrict__ ck_cu, const int2* __restrict__ items, const int* __restrict__ geom, int H) {
+                                   CK* __restrict__ ck, const long long* __restrict__ ck_cu, const int2* __restrict__ items, const int* __restrict__ geom, int H) {
   if (geom[1] == 0) return;
   const int i = blockIdx.x / H, h = blockIdx.x % H;
   if (i >= geom[10]) return;
@@ -47,8 +59,7 @@ __global__ void copy_ck_dyn_kernel(const float4* __restrict__ sa, const float4* 
   const float4* s;
   if (it.y < 0) s = (sa_base ? sa_base + ((d_idx ? (long long)d_idx[j] : (long long)j) * d_stride) / 4 : sa) + (long long)h * 4096;
   else s = sin_ + (long long)it.y * H * 4096 + (long long)h * 4096;
-  float4* d = ck + ((rb + it.x) * H + h) * 4096;
-  for (int k = threadIdx.x; k < 4096; k += blockDim.x) d[k] = s[k];
+  ck_copy_row(ck + ((rb + it.x) * H + h) * (sizeof(CK) == 16 ? 4096 : 16384), s);
 }
 }  // namespace
 
@@ -70,7 +81,12 @@ void scatter_state(torch::Tensor sfix, torch::Tensor final_state, c10::optional<
 void copy_ck_dyn(torch::Tensor sa, c10::optional<torch::Tensor> sa_base, c10::optional<torch::Tensor> d_idx, int64_t d_stride, torch::Tensor sin_, torch::Tensor ck, torch::Tensor ck_cu,
                  torch::Tensor items, torch::Tensor geom, int64_t H) {
   KdaDevGuard dev_guard_(sa);   // [multi-GPU] launch on the tensors' device
-  copy_ck_dyn_kernel<<<(unsigned)(2 * H), 256, 0, c10::cuda::getCurrentCUDAStream()>>>((const float4*)sa.data_ptr(), sa_base ? (const float4*)sa_base->data_ptr() : nullptr,
+  if (ck.scalar_type() == at::kBFloat16)   // [bf16ckpt]
+    copy_ck_dyn_kernel<__nv_bfloat16><<<(unsigned)(2 * H), 256, 0, c10::cuda::getCurrentCUDAStream()>>>((const float4*)sa.data_ptr(), sa_base ? (const float4*)sa_base->data_ptr() : nullptr,
+        d_idx ? d_idx->data_ptr<int>() : nullptr, d_stride, sin_.numel() ? (const float4*)sin_.data_ptr() : nullptr, (__nv_bfloat16*)ck.data_ptr(), (const long long*)ck_cu.data_ptr(),
+        (const int2*)items.data_ptr(), geom.data_ptr<int>(), (int)H);
+  else
+  copy_ck_dyn_kernel<float4><<<(unsigned)(2 * H), 256, 0, c10::cuda::getCurrentCUDAStream()>>>((const float4*)sa.data_ptr(), sa_base ? (const float4*)sa_base->data_ptr() : nullptr,
       d_idx ? d_idx->data_ptr<int>() : nullptr, d_stride, sin_.numel() ? (const float4*)sin_.data_ptr() : nullptr, (float4*)ck.data_ptr(), (const long long*)ck_cu.data_ptr(),
       (const int2*)items.data_ptr(), geom.data_ptr<int>(), (int)H);
   C10_CUDA_KERNEL_LAUNCH_CHECK();
@@ -80,7 +96,8 @@ void aux_init() {
   cudaFree(0);
   cudaFuncSetAttribute(zero_qt_tail_kernel, cudaFuncAttributePreferredSharedMemoryCarveout, 100);
   cudaFuncSetAttribute(scatter_state_kernel, cudaFuncAttributePreferredSharedMemoryCarveout, 100);
-  cudaFuncSetAttribute(copy_ck_dyn_kernel, cudaFuncAttributePreferredSharedMemoryCarveout, 100);
+  cudaFuncSetAttribute(copy_ck_dyn_kernel<float4>, cudaFuncAttributePreferredSharedMemoryCarveout, 100);
+  cudaFuncSetAttribute(copy_ck_dyn_kernel<__nv_bfloat16>, cudaFuncAttributePreferredSharedMemoryCarveout, 100);
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {

@@ -635,7 +635,7 @@ __device__ __forceinline__ void sio_state_store(float* __restrict__ g, uint32_t 
 #define RW_PARAMS
 #endif
 #ifdef KDA_FEAT
-#define FEAT_PARAMS , const int* __restrict__ src_idx, long long src_stride, const int* __restrict__ dst_idx, long long dst_stride, float* __restrict__ ck_base, const long long* __restrict__ ck_cu, int ck_n
+#define FEAT_PARAMS , const int* __restrict__ src_idx, long long src_stride, const int* __restrict__ dst_idx, long long dst_stride, ck_t* __restrict__ ck_base, const long long* __restrict__ ck_cu, int ck_n
 #define SRC_OFF(seq, head) ((src_idx != nullptr ? (long long)__ldg(src_idx + (seq)) : (long long)(seq)) * src_stride + (long long)(head) * 16384)
 #define DST_OFF(seq, head) ((dst_idx != nullptr ? (long long)__ldg(dst_idx + (seq)) : (long long)(seq)) * dst_stride + (long long)(head) * 16384)
 #define SRC_OFF_T(tv) SRC_OFF((tv) / num_heads, (tv) % num_heads)
@@ -1360,7 +1360,7 @@ kernel_flashkda_bf16_fused_m128(__nv_bfloat16* __restrict__ q, const void* __res
                 const int seq = tval / num_heads, head = tval % num_heads;
                 const long long row = __ldg(ck_cu + seq);
                 if (row >= 0 && cu_seqlens[seq + 1] > cu_seqlens[seq]) {
-                    float* dst = ck_base + (row * (long long)num_heads + head) * 16384 + hw * 8192;
+                    ck_t* dst = ck_base + (row * (long long)num_heads + head) * 16384 + hw * 8192;
                     if (use_initial_state != 0) {
                         const float* src = initial_state + SRC_OFF_T(tval) + hw * 8192;
                         #pragma unroll 1
@@ -1371,14 +1371,28 @@ kernel_flashkda_bf16_fused_m128(__nv_bfloat16* __restrict__ q, const void* __res
                             asm volatile("ld.global.cg.v4.f32 {%0,%1,%2,%3}, [%4];" : "=f"(r1.x), "=f"(r1.y), "=f"(r1.z), "=f"(r1.w) : "l"(sp + 32) : "memory");
                             asm volatile("ld.global.cg.v4.f32 {%0,%1,%2,%3}, [%4];" : "=f"(r2.x), "=f"(r2.y), "=f"(r2.z), "=f"(r2.w) : "l"(sp + 64) : "memory");
                             asm volatile("ld.global.cg.v4.f32 {%0,%1,%2,%3}, [%4];" : "=f"(r3.x), "=f"(r3.y), "=f"(r3.z), "=f"(r3.w) : "l"(sp + 96) : "memory");
+#ifdef KDA_CKBF   // [bf16ckpt] row 0 = the initial state rounded to bf16 (8 B per float4)
+                            uint2* dp = reinterpret_cast<uint2*>(dst) + b * 128 + lane;
+                            dp[0] = make_uint2(ck_pack_bf16(__float_as_uint(r0.x), __float_as_uint(r0.y)), ck_pack_bf16(__float_as_uint(r0.z), __float_as_uint(r0.w)));
+                            dp[32] = make_uint2(ck_pack_bf16(__float_as_uint(r1.x), __float_as_uint(r1.y)), ck_pack_bf16(__float_as_uint(r1.z), __float_as_uint(r1.w)));
+                            dp[64] = make_uint2(ck_pack_bf16(__float_as_uint(r2.x), __float_as_uint(r2.y)), ck_pack_bf16(__float_as_uint(r2.z), __float_as_uint(r2.w)));
+                            dp[96] = make_uint2(ck_pack_bf16(__float_as_uint(r3.x), __float_as_uint(r3.y)), ck_pack_bf16(__float_as_uint(r3.z), __float_as_uint(r3.w)));
+#else
                             float4* dp = reinterpret_cast<float4*>(dst) + b * 128 + lane;
                             dp[0] = r0; dp[32] = r1; dp[64] = r2; dp[96] = r3;
+#endif
                         }
                     } else {
                         const float4 z = make_float4(0.f, 0.f, 0.f, 0.f);
+#ifdef KDA_CKBF
+                        uint2* dp = reinterpret_cast<uint2*>(dst) + lane;
+                        #pragma unroll 1
+                        for (int i = 0; i < 64; i++) dp[i * 32] = make_uint2(0u, 0u);
+#else
                         float4* dp = reinterpret_cast<float4*>(dst) + lane;
                         #pragma unroll 1
                         for (int i = 0; i < 64; i++) dp[i * 32] = z;
+#endif
                     }
                 }
                 __syncwarp();

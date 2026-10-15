@@ -16,7 +16,7 @@ Serving features (keyword arguments, FlashInfer `recurrent_kda` prefill contract
   ssm_state_indices          int32 [N]: initial_state is a state pool [P, H, 128, 128] (slot stride >= H*128*128,
                              16-byte aligned); sequence i reads and updates slot ssm_state_indices[i] in place, every
                              other slot stays bit-identical, and final_state is the pool itself.
-  state_checkpoints          fp32 [C, H, 128, 128] (contiguous), with checkpoint_cu_starts int64 [N + 1] and
+  state_checkpoints          fp32 or bf16 [C, H, 128, 128] (contiguous; bf16 rows are the fp32 states rounded to nearest even), with checkpoint_cu_starts int64 [N + 1] and
   checkpoint_every_n_tokens  n (multiple of 64; 0 = off): sequence i writes row checkpoint_cu_starts[i] + j = its
                              state before token j * n, j = 0 .. ceil(len_i / n) - 1. The call then returns
                              (output, final_state, state_checkpoints).

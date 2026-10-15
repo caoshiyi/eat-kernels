@@ -120,7 +120,11 @@ fixup2(const __grid_constant__ CUtensorMap mo, const __grid_constant__ CUtensorM
        const __grid_constant__ CUtensorMap mfin, const __grid_constant__ CUtensorMap mck, const float* __restrict__ sa, const float* __restrict__ P,
        const float* __restrict__ sloc, float* __restrict__ sin_, float* __restrict__ sfin, const int4* __restrict__ seg, const int* __restrict__ seg_ptr,
        int H, int tail, int m, const float* __restrict__ snapP, const float* __restrict__ snapL, const int4* __restrict__ cki, int ns,
-       float* __restrict__ fin_pool, const int* __restrict__ fin_idx, long long fin_stride, int fin_seq, const long long* __restrict__ ck_base) {
+       float* __restrict__ fin_pool, const int* __restrict__ fin_idx, long long fin_stride, int fin_seq, const long long* __restrict__ ck_base
+#ifdef KDA_CKBF
+       , __nv_bfloat16* __restrict__ ckp
+#endif
+       ) {
   extern __shared__ uint8_t smem_raw[];
   __shared__ __align__(8) uint64_t bars[3];           // [0..1] = state-item MMA done / unused
   __shared__ __align__(8) uint64_t full[NS], mdone[2], edone[NS];
@@ -261,6 +265,20 @@ fixup2(const __grid_constant__ CUtensorMap mo, const __grid_constant__ CUtensorM
       tc_before();
       fence_async();
       bar_epi();
+#ifdef KDA_CKBF
+      if (!chain) {   // [bf16ckpt] checkpoint item: the fp32 result staged in Ls is rounded to bf16 (RNE) and stored directly by the 256 epilogue threads (a rejected sequence has row == 1 << 30: no store)
+        if (row != (1 << 30)) {
+          __nv_bfloat16* dstb = ckp + (size_t)row * 128;
+          #pragma unroll
+          for (int k = 0; k < 16; k++) {
+            const int idx = k * NT + threadIdx.x, r = idx >> 5, c = idx & 31;
+            const float4 f = *(const float4*)(Ls + (c >> 3) * 16384 + r * 128 + (((c & 7) ^ (r & 7)) << 4));
+            const __nv_bfloat162 b0 = __floats2bfloat162_rn(f.x, f.y), b1 = __floats2bfloat162_rn(f.z, f.w);
+            *(uint2*)(dstb + r * 128 + c * 4) = make_uint2(*(const uint32_t*)&b0, *(const uint32_t*)&b1);
+          }
+        }
+      } else
+#endif
       if (chain && pc == m - 1 && fin_pool != nullptr) {   // [contract] the final state goes straight to its pool slot (slot read on the device), by the 256 epilogue threads
         float* dstp = fin_pool + (long long)__ldg(fin_idx + fin_seq) * fin_stride + (size_t)h * 16384;
         #pragma unroll
@@ -436,12 +454,20 @@ void run_fixup(at::Tensor out, at::Tensor oq, at::Tensor sa, at::Tensor P, at::T
   CUtensorMap mfin = make_map_f32(sfin.data_ptr(), (int)H * 128);
   CUtensorMap msin = sin_.numel() ? make_map_f32(sin_.data_ptr(), (int)(m - 1) * (int)H * 128) : mfin;
   const int ns = cki ? (int)cki->size(0) : 0;
+  #ifdef KDA_CKBF
+  CUtensorMap mck = mfin;   // [bf16ckpt] checkpoint rows are stored directly (no TMA map)
+#else
   CUtensorMap mck = ns ? make_map_f32(ck_buf->data_ptr(), (int)(ck_buf->size(0) * H * 128)) : mfin;
+#endif
   cpfix::fixup2<<<(unsigned)grid, cpfix::NTH, cpfix::SMEM, c10::cuda::getCurrentCUDAStream()>>>(
       mo, mq, msin, mfin, mck, sa.data_ptr<float>(), P.data_ptr<float>(), sloc.data_ptr<float>(), sin_.numel() ? sin_.data_ptr<float>() : nullptr, sfin.data_ptr<float>(),
       (const int4*)seg.data_ptr<int>(), seg_ptr.data_ptr<int>(), (int)H, (int)tail, (int)m,
       ns ? snap_p->data_ptr<float>() : nullptr, ns ? snap_l->data_ptr<float>() : nullptr, ns ? (const int4*)cki->data_ptr<int>() : nullptr, ns,
-      fin_pool ? fin_pool->data_ptr<float>() : nullptr, fin_idx ? fin_idx->data_ptr<int>() : nullptr, (long long)fin_stride, (int)fin_seq, ck_base ? (const long long*)ck_base->data_ptr() : nullptr);
+      fin_pool ? fin_pool->data_ptr<float>() : nullptr, fin_idx ? fin_idx->data_ptr<int>() : nullptr, (long long)fin_stride, (int)fin_seq, ck_base ? (const long long*)ck_base->data_ptr() : nullptr
+#ifdef KDA_CKBF
+      , ns ? (__nv_bfloat16*)ck_buf->data_ptr() : nullptr
+#endif
+      );
   C10_CUDA_KERNEL_LAUNCH_CHECK();
 }
 

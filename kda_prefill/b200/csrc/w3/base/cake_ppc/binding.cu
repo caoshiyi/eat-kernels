@@ -1,6 +1,7 @@
 // Torch binding for the fp32-state CAKE KDA prefill kernels (M64 / M128).
 #include <cuda.h>
 #include <cuda_bf16.h>
+#include "../ck_type.cuh"
 #include <cuda_runtime.h>
 #include <torch/extension.h>
 #include <c10/cuda/CUDAStream.h>
@@ -12,7 +13,7 @@ struct KdaDevGuard {
 };
 
 #ifdef KDA_FEAT
-#define FEAT_DECL , const int*, long long, const int*, long long, float*, const long long*, int
+#define FEAT_DECL , const int*, long long, const int*, long long, ck_t*, const long long*, int
 #else
 #define FEAT_DECL
 #endif
@@ -108,7 +109,7 @@ void launch(int64_t variant, torch::Tensor q, torch::Tensor k, torch::Tensor v, 
                 out.data_ptr(), final_state.data_ptr<float>(), (int)num_heads, (float)scale, (float)lower_bound
 #ifdef KDA_FEAT
                 , src_idx ? src_idx->data_ptr<int>() : nullptr, src_stride, dst_idx ? dst_idx->data_ptr<int>() : nullptr, dst_stride,
-                ck_base ? ck_base->data_ptr<float>() : nullptr, ck_cu ? (const long long*)ck_cu->data_ptr<int64_t>() : nullptr, (int)ck_n
+                ck_base ? (ck_t*)ck_base->data_ptr() : nullptr, ck_cu ? (const long long*)ck_cu->data_ptr<int64_t>() : nullptr, (int)ck_n
 #endif
                 );
     C10_CUDA_KERNEL_LAUNCH_CHECK();

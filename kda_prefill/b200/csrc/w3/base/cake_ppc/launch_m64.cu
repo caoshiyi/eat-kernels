@@ -4,6 +4,7 @@
 #undef __CUDA_NO_HALF2_OPERATORS__
 #undef __CUDA_NO_BFLOAT16_OPERATORS__
 #include <cuda_bf16.h>
+#include "../ck_type.cuh"
 #include <cuda_runtime.h>
 #define uint8_t g_uint8_t
 #define uint16_t g_uint16_t

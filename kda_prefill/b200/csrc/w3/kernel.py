@@ -71,6 +71,7 @@ _dyncp = _load("kda_pg_dyncp", os.path.join(_HERE, "..", "dyn", "dyncp.py"))   #
 _dynmp = _load("kda_pg_dynmp", os.path.join(_HERE, "..", "dyn", "dynmp.py"))   # [dynfew] device-planned many-piece context-parallel path for few-head multi-sequence launches
 _fix = None
 _fix_ck = None
+_fix_ck_bf = None
 
 
 def _dev_index(dev):
@@ -108,8 +109,12 @@ def _fixsched():
 
 
 def _fixmod(ck=False):
-    global _fix, _fix_ck
+    global _fix, _fix_ck, _fix_ck_bf
     if ck:   # [contract] cp_fix_ck.cu: the fixup with checkpoint items (the default fixup is the v44 kernel, unchanged)
+        if _base.ck_bf16():   # [bf16ckpt] bf16 checkpoint rows: own flavor
+            if _fix_ck_bf is None:
+                _fix_ck_bf = _load("kda_cp_fix_build_ck_bf", os.path.join(_HERE, "build_fix.py")).build(ck=True, bf=True)
+            return _fix_ck_bf
         if _fix_ck is None:
             _fix_ck = _load("kda_cp_fix_build_ck", os.path.join(_HERE, "build_fix.py")).build(ck=True)
         return _fix_ck
@@ -1029,6 +1034,7 @@ def _prepare_feat(q, k, v, g, beta, A_log, dt_bias, scale, initial_state, cu_seq
     initial_state_indices, checkpoint_cu_starts; int32 or int64) into sanitized private copies; the kernels only ever see those.  No host sync."""
     B, T, H, D = q.shape
     dev = q.device
+    _base._tls.bf = bool(checkpoint_every_n_tokens) and torch.is_tensor(state_checkpoints) and state_checkpoints.dtype == torch.bfloat16   # [bf16ckpt] picks the KDA_CKBF kernel flavors for everything prepared below (this thread)
     N = 1 if cu_seqlens is None else cu_seqlens.numel() - 1      # shapes only: dynamic_layout must not read the contents of any table on the host
     if N < 1:
         raise ValueError("KDA kernel: cu_seqlens must describe at least one sequence")
@@ -1085,12 +1091,12 @@ def _prepare_feat(q, k, v, g, beta, A_log, dt_bias, scale, initial_state, cu_seq
             raise ValueError(f"KDA kernel: checkpoint_every_n_tokens must be a multiple of 32 (chunk size; the contract uses multiples of 64), got {n}")
         if state_checkpoints is None or checkpoint_cu_starts is None:
             raise ValueError("KDA kernel: checkpoint_every_n_tokens needs state_checkpoints and checkpoint_cu_starts")
-        if not (state_checkpoints.dtype == torch.float32 and state_checkpoints.is_contiguous() and state_checkpoints.dim() == 4
+        if not (state_checkpoints.dtype in (torch.float32, torch.bfloat16) and state_checkpoints.is_contiguous() and state_checkpoints.dim() == 4
                 and tuple(state_checkpoints.shape[1:]) == (H, D, D)):
-            raise ValueError("KDA kernel: state_checkpoints must be a contiguous fp32 [C, H, 128, 128] tensor")
+            raise ValueError("KDA kernel: state_checkpoints must be a contiguous fp32 or bf16 [C, H, 128, 128] tensor")
         if state_checkpoints.data_ptr() % 32:   # the checkpoint stores are 256-bit: a buffer that is not 32-byte aligned is staged through an aligned private copy (copied in and out around the launch)
             ck_user = state_checkpoints
-            state_checkpoints = torch.empty(ck_user.shape, dtype=torch.float32, device=dev)
+            state_checkpoints = torch.empty(ck_user.shape, dtype=ck_user.dtype, device=dev)
         ck_in = _table(checkpoint_cu_starts, "checkpoint_cu_starts", N + 1, dynamic_layout)
         ck_safe = torch.empty(N + 1, dtype=torch.int64, device=dev)
         ck = (state_checkpoints, ck_safe, n // 32)

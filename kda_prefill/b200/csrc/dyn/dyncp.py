@@ -18,11 +18,12 @@ def _load(name, path):
 _mods = {}
 
 
-def _m(name):
-    if name not in _mods:
+def _m(name, bf=False):
+    key = name + ("_bf" if bf else "")
+    if key not in _mods:
         ck = name == "fixck"
-        _mods[name] = _load("kda_pg_" + name, os.path.join(_HERE, {"plan": "build.py", "fix": "build_fix.py", "fixck": "build_fix.py", "aux": "build_aux.py"}[name])).build(**({"ck": True} if ck else {}))
-    return _mods[name]
+        _mods[key] = _load("kda_pg_" + key, os.path.join(_HERE, {"plan": "build.py", "fix": "build_fix.py", "fixck": "build_fix.py", "aux": "build_aux.py"}[name])).build(**({"ck": True, **({"bf": True} if bf else {})} if ck else {}))
+    return _mods[key]
 
 
 _streams = {}
@@ -123,7 +124,7 @@ def prepare(base, dual, q, k, v, g, beta, A_log, dt_bias, scale, src, dst, cu_se
     pk = {"val": val} if val else {}   # [contract2] table validation (a second block of the planner launch); the planner also writes the sanitized cu_seqlens (the kernels below read cu_k)
     cu_k = val["cu_out"] if val and val["cu_out"] is not None else cu
     N = cu.numel() - 1
-    planner, fixdyn, aux = _m("plan"), _m("fixck" if ck else "fix"), _m("aux")
+    planner, fixdyn, aux = _m("plan"), _m("fixck" if ck else "fix", bool(ck) and base.ck_bf16()), _m("aux")
     key = dev.index if dev.index is not None else torch.cuda.current_device()
     with torch.cuda.device(key):
         planner.init()

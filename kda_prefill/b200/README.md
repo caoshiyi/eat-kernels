@@ -3,9 +3,10 @@
 Kimi Delta Attention (chunked gated delta rule with per-channel gates) forward / chunked prefill for Kimi-K3
 serving on B200: H = 12 (TP8) or 16 heads per GPU, head dim 128, varlen batches, a paged state pool, prefix-cache
 checkpoints every 64 tokens, and one CUDA graph replayed across batch layouts. Written in CUDA C++ (tcgen05 / TMEM /
-TMA, inline PTX) with Python host glue. On the 26 serving workloads below it is **2.41x faster than FlashKDA**
-(geomean), and on the six Int21 workloads (H = 64 / 96, plain calls) **3.34x**, while doing strictly more work than
-FlashKDA in the serving set (pool gather / scatter and checkpoint writes).
+TMA, inline PTX) with Python host glue. On the 26 serving workloads below it is **2.58x faster than FlashKDA**
+(geomean) with bf16 checkpoint rows and 2.41x with fp32 rows, and on the six Int21 workloads (H = 64 / 96, plain
+calls) **3.34x**, while doing strictly more work than FlashKDA in the serving set (pool gather / scatter and
+checkpoint writes).
 
 ## Use
 
@@ -52,6 +53,7 @@ and `cupti-python` >= 13.
 ```bash
 CUDA_VISIBLE_DEVICES=0 python test_kda_b200.py     # correctness vs the fp64 recurrence (16 min from an empty build cache)
 CUDA_VISIBLE_DEVICES=0 python bench.py             # 26 serving + 6 Int21 workloads vs FlashKDA (about 8 min once built)
+CUDA_VISIBLE_DEVICES=0 python bench.py --ckpt-dtype bf16   # the same with bf16 checkpoint rows
 CUDA_VISIBLE_DEVICES=0 python bench.py --quick     # 1 trial x 10 iterations
 ```
 
@@ -64,7 +66,8 @@ N + 8 slots with a random slot permutation, checkpoints are written every 64 tok
 `prepare(..., dynamic_layout=True)`; FlashKDA gets contiguous initial states and writes no checkpoints. Every workload
 is checked against FLA's Triton `chunk_kda` (output and updated state) before timing and after an in-place refill.
 
-One `bench.py` run of this directory from a fresh checkout with empty build caches (seed 10049429):
+One `bench.py` run with fp32 checkpoint rows, from a fresh checkout with empty build caches (seed 10049429; this
+table was measured before bf16 checkpoints were added, and the fp32 path is unchanged):
 
 | workload | H | sequence lengths | this (ms) | FlashKDA (ms) | speedup |
 |---|---|---|---|---|---|
@@ -105,6 +108,31 @@ One `bench.py` run of this directory from a fresh checkout with empty build cach
 
 (The eval names the 16-sequence residual workload "17..255"; its generator re-seeds per draw, so all 16 lengths are 109.)
 
+### bf16 checkpoints
+
+`state_checkpoints` may be bf16. Each row is the fp32 state rounded to nearest even, bit-identical to rounding the
+rows of the same call with an fp32 buffer (output and pool are unchanged); the rows are stored as full 128 B lines,
+half the bytes of an fp32 row. One `bench.py --ckpt-dtype bf16` run (seed 7168497), serving workloads:
+
+| workload | H = 12 (ms) | speedup | H = 16 (ms) | speedup |
+|---|---|---|---|---|
+| long-1x8192 | 0.1333 | 5.83x | 0.1544 | 5.11x |
+| long-1x32768 | 0.3622 | 8.39x | 0.4594 | 6.72x |
+| long-2x8192 | 0.2205 | 3.71x | 0.2998 | 2.81x |
+| long-3000+13384 | 0.2369 | 5.37x | 0.2778 | 4.67x |
+| long-4x4096 | 0.2214 | 2.07x | 0.2536 | 1.91x |
+| long-8x1088 | 0.0840 | 1.92x | 0.0858 | 2.04x |
+| resid-4x64 | 0.0165 | 1.77x | 0.0171 | 1.73x |
+| resid-16x64 | 0.0271 | 1.57x | 0.0283 | 1.59x |
+| resid-64x64 | 0.0619 | 1.74x | 0.0701 | 1.90x |
+| resid-16x256 | 0.0544 | 1.50x | 0.0563 | 1.60x |
+| resid-16x17..255 | 0.0369 | 1.57x | 0.0380 | 1.62x |
+| agent8 | 0.2987 | 2.96x | 0.3560 | 2.57x |
+| agent16 | 0.5453 | 2.43x | 0.5419 | 2.56x |
+| **serving geomean** | | | | **2.579x** |
+
+Int21 geomean in the same run: 3.341x.
+
 Repeat measurements of the same sources with the official eval:
 
 | run | serving geomean | Int21 geomean |
@@ -112,6 +140,7 @@ Repeat measurements of the same sources with the official eval:
 | this directory, through the official eval (all gates) | 2.414 | 3.348 |
 | this directory, `bench.py` from a fresh checkout (table above) | 2.416 | 3.329 |
 | the run's final kernel, official evals (3 runs) | 2.414 / 2.415 / 2.418 | 3.341 / 3.341 / 3.345 |
+| this directory with bf16 checkpoints, through the phase-3 official eval (all gates) | 2.582 (bf16 rows), 2.406 (fp32 rows) | 3.372 |
 
 Correctness and robustness: all **117 correctness gates** of the official eval pass on this directory, re-run after
 freezing the defaults: serving and Int21 workloads, fp64 probes off the timed distribution, a real-workload gate with
@@ -160,17 +189,20 @@ H % 8 != 0, few heads, source pool, checkpoints every 256, up to 256 sequences).
 
 The starting point was the first SM100-family KDA prefill kernels in FlashInfer (the CAKE team's `flashkda_*` M64 /
 M128 fused kernels, FlashInfer snapshot of Aug 13, 2026, Apache-2.0); the derived kernel files keep their NVIDIA
-copyright headers (see NOTICE). An EAT supervisor-evolved agent team rewrote and extended them in two phases: phase 1
+copyright headers (see NOTICE). An EAT supervisor-evolved agent team rewrote and extended them in three phases: phase 1
 optimized plain calls on the six Int21 workloads (37 iterations, Oct 7-10, 2026: from about 2x for the FlashInfer
 kernels to 3.48x over FlashKDA), phase 2 adapted the kernel to serving (20 iterations, Oct 10-13, 2026: 2.10x -> 2.41x
-on the serving set, Int21 kept above its 3.27 floor). It was a clean-room run: the agents had no network access, and
+on the serving set, Int21 kept above its 3.27 floor), and phase 3 (Oct 14-15, 2026) added bf16 checkpoint rows
+(2.41x -> 2.58x on the serving set). It was a clean-room run: the agents had no network access, and
 no access to FlashInfer's KDA kernels newer than that snapshot or to any other team's KDA kernels.
 
-The harness is [EAT](https://github.com/caoshiyi/EAT); the complete traces are in
+The harness is [EAT](https://github.com/caoshiyi/EAT); the complete traces of phases 1 and 2 are in
 [eva98/eat-evolution-traces](https://huggingface.co/datasets/eva98/eat-evolution-traces) (`b200_kda_clean/`):
 - every supervisor and agent transcript;
 - the team configurations;
 - the notes, and the kernel at every iteration.
 
 This directory corresponds to `solutions/phase2_serving/cake_v62` of that run (phase 2 closeout, Oct 13, 2026), with the production
-defaults frozen as described above.
+defaults frozen as described above, plus the bf16 checkpoint flavor of phase 3 (`cake_v64_bf16`). Phase 3 also
+added a build without the partial-chunk handling for static plain calls whose sequence lengths are all multiples of
+32 (about 1% on the Int21 workloads); it is not included.

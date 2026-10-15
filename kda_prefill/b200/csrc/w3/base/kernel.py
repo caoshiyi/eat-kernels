@@ -36,18 +36,27 @@ PLAN_DBG = None   # tools: int64 [16] device tensor receiving the lean plain pla
 _feat = {}   # [contract] KDA_FEAT builds of the plain / cio kernels (state pool, source pool, prefix-cache checkpoints), built on first use
 
 
+import threading
+_tls = threading.local()   # [bf16ckpt] per-thread flag read at prepare time: the checkpoint buffer of the call being prepared is bf16 (selects the -DKDA_CKBF flavor of the checkpoint kernels)
+
+
+def ck_bf16():
+    return bool(getattr(_tls, "bf", False))
+
+
 def _build_dir(sub, name, feat, ck=False, bd=False, rw=False):
     import importlib.util
     spec = importlib.util.spec_from_file_location(name, os.path.join(_HERE, sub, "build.py"))
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    return mod.build(feat=True, ck=ck, bd=True) if (feat and bd) else mod.build(feat=True, ck=ck, rw=True) if (feat and rw) else mod.build(feat=True, ck=ck) if feat else (mod.build(bd=True) if bd else mod.build())
+    bf = {"bf": True} if (feat and ck and ck_bf16()) else {}   # [bf16ckpt]
+    return mod.build(feat=True, ck=ck, bd=True, **bf) if (feat and bd) else mod.build(feat=True, ck=ck, rw=True, **bf) if (feat and rw) else mod.build(feat=True, ck=ck, **bf) if feat else (mod.build(bd=True) if bd else mod.build())
 
 
 def _feat_module(kind, sub, ck, rw=False, bd=False):
     """KDA_FEAT build (pool / source-pool addressing) of a kernel, or KDA_FEAT + KDA_CK (also prefix-cache checkpoints: the prep rebase hook and the
     checkpoint store sit in the chunk loops, so they are compiled only when a checkpoint buffer is given)."""
-    key = (kind, bool(ck), bool(rw), bool(bd))
+    key = (kind, bool(ck), bool(rw), bool(bd), bool(ck and ck_bf16()))
     if key not in _feat:
         _feat[key] = _build_dir(sub, f"kda_{kind}_build_f{int(bool(ck))}{'r' if rw else ''}{'b' if bd else ''}", True, bool(ck), bd=bool(bd), rw=bool(rw))
     return _feat[key]

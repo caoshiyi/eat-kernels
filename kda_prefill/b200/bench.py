@@ -39,6 +39,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 D = 128
 LOWER_BOUND = -5.0
 EVERY = 64
+CK_DTYPE = torch.float32
 ATOL_RMS, RTOL, MAX_REL_L2 = 0.5, 0.05, 0.03
 
 AGENT = [256, 512, 900, 1600, 1600, 2400, 4000, 8700]
@@ -154,7 +155,7 @@ def serving_case(mod, H, lens, seed, warmup, iters, trials):
     pool = pool_of(N + 8, H, gen)
     idx = torch.randperm(N + 8, generator=gen, device="cuda")[:N].to(torch.int32)
     ccs, C = ck_meta(lens, EVERY)
-    ck = torch.zeros((C, H, D, D), device="cuda")
+    ck = torch.zeros((C, H, D, D), device="cuda", dtype=CK_DTYPE)
     kw = dict(ssm_state_indices=idx, state_checkpoints=ck, checkpoint_cu_starts=ccs, checkpoint_every_n_tokens=EVERY)
 
     def reference():
@@ -243,7 +244,10 @@ def main(argv=None) -> int:
     ap.add_argument("--iters", type=int, default=30)
     ap.add_argument("--trials", type=int, default=3)
     ap.add_argument("--json", default=None, help="write per-workload results to this file")
+    ap.add_argument("--ckpt-dtype", choices=("fp32", "bf16"), default="fp32", help="serving checkpoint buffer dtype")
     args = ap.parse_args(argv)
+    global CK_DTYPE
+    CK_DTYPE = torch.bfloat16 if args.ckpt_dtype == "bf16" else torch.float32
     if args.quick:
         args.iters, args.trials = 10, 1
     seed = args.seed if args.seed is not None else int.from_bytes(os.urandom(3), "little")

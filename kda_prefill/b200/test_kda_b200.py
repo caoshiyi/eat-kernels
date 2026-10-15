@@ -210,6 +210,36 @@ def test_dynamic_layout_graph_replay():
                     close(ck[:C], gck, tag + " checkpoints")
 
 
+def test_bf16_checkpoints():
+    """bf16 checkpoint rows are the fp32 rows rounded to nearest even; output and pool are unchanged by the dtype."""
+    for H, lens, every, mode in ((12, [300, 64, 1, 1000, 77], 64, "run"), (16, [4096] * 4, 64, "dynamic"),
+                                 (12, [8192], 256, "static"), (12, [2048, 513, 77, 900], 64, "dynamic")):
+        inputs = make_inputs(H, lens, 1000 + H + len(lens))
+        q, k, v, g, beta, A_log, dt_bias, scale, _, _ = inputs
+        gen = torch.Generator(device="cuda").manual_seed(H * 7 + len(lens))
+        N, P = len(lens), len(lens) + 3
+        pool0 = torch.randn(P, H, D, D, generator=gen, device="cuda") * 0.25
+        idx = torch.randperm(P, generator=gen, device="cuda")[:N].to(torch.int32)
+        ccs, C = ck_meta(lens, every)
+        got = {}
+        for dt in (torch.float32, torch.bfloat16):
+            pool, cu = pool0.clone(), cu_of(lens)
+            ck = torch.full((C, H, D, D), float("nan"), device="cuda", dtype=dt)
+            kw = dict(ssm_state_indices=idx, state_checkpoints=ck, checkpoint_cu_starts=ccs, checkpoint_every_n_tokens=every)
+            with torch.no_grad():
+                if mode == "run":
+                    res = kda_b200.kda_prefill(q, k, v, g, beta, A_log, dt_bias, pool, cu, scale, **kw)
+                else:
+                    res = kda_b200.prepare(q, k, v, g, beta, A_log, dt_bias, scale, pool, cu,
+                                           dynamic_layout=(mode == "dynamic"), **kw)()
+                torch.cuda.synchronize()
+            got[dt] = (res[0].clone(), pool.clone(), ck)
+        tag = f"bf16 checkpoints {mode} H={H} lens={lens[:6]} every={every}"
+        assert torch.equal(got[torch.float32][0], got[torch.bfloat16][0]), tag + ": output differs"
+        assert torch.equal(got[torch.float32][1], got[torch.bfloat16][1]), tag + ": pool differs"
+        assert torch.equal(got[torch.float32][2].to(torch.bfloat16), got[torch.bfloat16][2]), tag + ": rows != rounded fp32 rows"
+
+
 def test_wrapper_matches_run():
     inputs = make_inputs(12, [1000, 3000, 17], 900)
     q, k, v, g, beta, A_log, dt_bias, scale, init, cu = inputs
