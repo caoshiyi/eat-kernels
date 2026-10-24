@@ -1,0 +1,136 @@
+# Official run of benchmark/eval_kda_mi350x.py (no options) from a fresh clone of this repository, HIP_VISIBLE_DEVICES=<one MI350X>,
+# 2026-10-13, ROCm 7.2.0, torch 2.14.0+rocm7.2. Build / warning lines removed. Seed is random per run.
+[OK] AMD Instinct MI350X | <repo>/kda/kernel.py | seed 7761493
+
+prefill workload    H   N      T |   vLLM us   cand us  speedup | correctness
+p12_loaded8k_0     12   2   7936 |     241.2      79.3   3.042x | PASS (out 4.3e-03 pool 3.8e-04, after refill out 4.3e-03 pool 3.5e-04)
+p12_loaded8k_1     12   4   8192 |     250.4      74.7   3.354x | PASS (out 3.9e-03 pool 3.7e-04, after refill out 3.9e-03 pool 3.7e-04)
+p12_loaded8k_2     12   1   7936 |     201.1      80.8   2.495x | PASS (out 4.3e-03 pool 3.8e-04, after refill out 4.3e-03 pool 3.6e-04)
+p12_loaded16k_0    12   3  16128 |     393.0     129.7   3.024x | PASS (out 4.1e-03 pool 3.7e-04, after refill out 4.1e-03 pool 3.7e-04)
+p12_loaded16k_1    12  12  15872 |     456.9     112.4   4.057x | PASS (out 3.9e-03 pool 3.7e-04, after refill out 3.9e-03 pool 3.8e-04)
+p12_loaded16k_2    12  11  16384 |     615.1     121.9   5.046x | PASS (out 4.1e-03 pool 3.7e-04, after refill out 4.1e-03 pool 3.6e-04)
+p12_light8k_0      12   2   8192 |     212.7      80.3   2.648x | PASS (out 4.2e-03 pool 3.6e-04, after refill out 4.2e-03 pool 3.6e-04)
+p12_light8k_1      12   3   2304 |      82.3      34.0   2.406x | PASS (out 3.2e-03 pool 3.0e-04, after refill out 3.2e-03 pool 3.1e-04)
+p12_light16k_0     12   1   1600 |      84.2      36.7   2.288x | PASS (out 4.3e-03 pool 3.6e-04, after refill out 4.3e-03 pool 3.5e-04)
+p12_light16k_1     12   1   1664 |      84.0      37.9   2.222x | PASS (out 4.3e-03 pool 3.7e-04, after refill out 4.2e-03 pool 3.6e-04)
+p96_loaded8k_0     96   1   8192 |    1233.9     343.1   3.590x | PASS (out 3.2e-03 pool 3.0e-04, after refill out 3.2e-03 pool 3.0e-04)
+p96_loaded8k_1     96   6   8064 |    1126.6     353.4   3.188x | PASS (out 3.2e-03 pool 3.0e-04, after refill out 3.2e-03 pool 3.0e-04)
+p96_light8k_0      96   3   2432 |     362.5     117.1   3.083x | PASS (out 3.2e-03 pool 3.0e-04, after refill out 3.2e-03 pool 3.0e-04)
+prefill_geomean_vs_vllm = 3.028 (all pass)
+
+decode workload     H   B  S |   base us   cand us  speedup | correctness
+s8_h12_b1          12   1  8 |     32.64     15.52   2.103x | PASS (out 4.4e-05 state 1.5e-07, replay with new indices/data: out 1.3e-04 state 1.6e-07)
+s8_h12_b4          12   4  8 |     37.18     18.72   1.987x | PASS (out 1.0e-04 state 1.8e-07, replay with new indices/data: out 1.1e-04 state 1.6e-07)
+s8_h12_b16         12  16  8 |     57.44     31.70   1.809x | PASS (out 5.7e-05 state 1.7e-07, replay with new indices/data: out 6.9e-05 state 1.8e-07)
+s8_h12_b32         12  32  8 |     88.50     54.14   1.649x | PASS (out 1.4e-05 state 1.7e-07, replay with new indices/data: out 1.4e-05 state 1.7e-07)
+s8_h12_b64         12  64  8 |    148.06     94.88   1.561x | PASS (out 4.9e-05 state 1.7e-07, replay with new indices/data: out 2.1e-05 state 2.0e-07)
+s8_h12_b128        12 128  8 |    266.46    172.30   1.546x | PASS (out 2.6e-05 state 2.0e-07, replay with new indices/data: out 6.1e-05 state 1.8e-07)
+d_h12_b64          12  64  1 |     30.76     28.74   1.070x | PASS (out 5.8e-06 state 1.4e-07, replay with new indices/data: out 7.2e-06 state 1.4e-07)
+s8_h96_b1          96   1  8 |     44.50     23.00   1.936x | PASS (out 8.8e-05 state 1.4e-07, replay with new indices/data: out 5.4e-06 state 1.4e-07)
+s8_h96_b8          96   8  8 |    145.64     89.92   1.618x | PASS (out 2.2e-05 state 1.4e-07, replay with new indices/data: out 2.3e-05 state 1.5e-07)
+s8_h96_b32         96  32  8 |    607.99    331.82   1.834x | PASS (out 3.8e-05 state 1.4e-07, replay with new indices/data: out 3.8e-05 state 1.4e-07)
+decode_geomean_vs_best_baseline = 1.686 (all pass)
+
+[gate] prefill contract (16 cases, fp32 reference)
+  heads_h1               H=1   N=7    T=2268    PASS (out 3.3e-03 pool 3.6e-04)
+  heads_h4               H=4   N=7    T=2268    PASS (out 3.3e-03 pool 3.7e-04)
+  heads_h8               H=8   N=7    T=2268    PASS (out 3.3e-03 pool 3.7e-04)
+  heads_h16              H=16  N=7    T=2268    PASS (out 3.4e-03 pool 3.6e-04)
+  heads_h24              H=24  N=7    T=2268    PASS (out 3.2e-03 pool 3.5e-04)
+  heads_h32              H=32  N=7    T=2268    PASS (out 3.7e-03 pool 3.6e-04)
+  heads_h48              H=48  N=7    T=2268    PASS (out 3.5e-03 pool 3.5e-04)
+  heads_h128             H=128 N=7    T=2268    PASS (out 3.2e-03 pool 3.5e-04)
+  ragged64_h12           H=12  N=64   T=10411   PASS (out 3.4e-03 pool 3.5e-04)
+  many256x64_h12         H=12  N=256  T=16384   PASS (out 3.5e-03 pool 3.2e-04)
+  tiny_h12               H=12  N=1    T=1       PASS (out 4.3e-03 pool 2.7e-04)
+  ck_at_64_h12           H=12  N=3    T=4289    PASS (out 4.3e-03 pool 3.6e-04)
+  meta_none_h12          H=12  N=3    T=8100    PASS (out 4.1e-03 pool 3.8e-04)
+  contiguous_pool_h12    H=12  N=2    T=2300    PASS (out 4.2e-03 pool 3.5e-04)
+  long64k_h12            H=12  N=1    T=65536   PASS (out 4.3e-03 pool 3.7e-04)
+  int64_extent_h96       H=96  N=176  T=180224  PASS (out 3.2e-03 pool 3.0e-04)
+
+[gate] prefill host behaviour
+  p12_loaded16k_1    PASS (no host sync; prepare on new layouts median 0.079 ms, limit 1.060 ms)
+  p96_loaded8k_1     PASS (no host sync; prepare on new layouts median 0.089 ms, limit 1.030 ms)
+
+[gate] numerics vs fp64 recurrence (per-sequence relative L2 <= 2e-2; vLLM's error shown for reference)
+  slow_decay_16k   PASS (out 4.1e-03 pool 9.2e-04 | vLLM out 5.7e-03 pool 4.6e-03)
+  spectrum_4x4k    PASS (out 2.4e-03 pool 7.5e-04 | vLLM out 5.4e-03 pool 4.2e-03)
+  saturated        PASS (out 3.8e-03 pool 3.4e-04 | vLLM out 4.4e-03 pool 2.4e-03)
+  deep_layer       PASS (out 4.0e-03 pool 1.4e-03 | vLLM out 9.2e-03 pool 9.5e-03)
+  deep_layer_h96   PASS (out 3.0e-03 pool 1.4e-03 | vLLM out 9.0e-03 pool 9.1e-03)
+  one_hot_keys     PASS (out 3.4e-03 pool 2.5e-04 | vLLM out 4.4e-03 pool 2.4e-03)
+  rescaled         PASS (out 5.2e-03 pool 3.7e-04 | vLLM out 6.1e-03 pool 3.0e-03)
+
+[gate] decode contract: 17 held-out shapes (page layout, uniform accepted counts, graph replay with new indices / data) + contiguous layout
+  h_d_h12_b8      H=12  B=8    S=1 pages PASS (out 8.4e-07 state 1.1e-07; replay out 1.2e-07 state 1.2e-07; eager out 1.2e-07 state 1.2e-07)
+  h_d_h12_b8      H=12  B=8    S=1 dense PASS (out 3.5e-06 state 1.2e-07; replay out 1.2e-04 state 1.2e-07; eager out 1.2e-04 state 1.2e-07)
+  h_d_h12_b200    H=12  B=200  S=1 pages PASS (out 2.8e-05 state 1.6e-07; replay out 2.8e-05 state 1.5e-07; eager out 2.8e-05 state 1.5e-07)
+  h_s2_h12_b8     H=12  B=8    S=2 pages PASS (out 7.4e-06 state 1.5e-07; replay out 2.1e-08 state 1.6e-07; eager out 2.1e-08 state 1.6e-07)
+  h_s4_h12_b40    H=12  B=40   S=4 pages PASS (out 5.7e-05 state 1.9e-07; replay out 2.2e-05 state 1.7e-07; eager out 2.2e-05 state 1.7e-07)
+  h_s8_h12_b100   H=12  B=100  S=8 pages PASS (out 4.4e-05 state 1.8e-07; replay out 4.1e-05 state 1.9e-07; eager out 4.1e-05 state 1.9e-07)
+  h_s8_h12_b100   H=12  B=100  S=8 dense PASS (out 2.9e-05 state 1.9e-07; replay out 4.1e-05 state 1.9e-07; eager out 4.1e-05 state 1.9e-07)
+  h_s8_h12_b256   H=12  B=256  S=8 pages PASS (out 4.6e-05 state 1.9e-07; replay out 2.4e-05 state 1.9e-07; eager out 2.4e-05 state 1.9e-07)
+  h_d_h24_b16     H=24  B=16   S=1 pages PASS (out 1.5e-05 state 1.3e-07; replay out 1.5e-05 state 1.2e-07; eager out 1.5e-05 state 1.2e-07)
+  h_s5_h24_b33    H=24  B=33   S=5 pages PASS (out 3.6e-05 state 1.5e-07; replay out 7.1e-05 state 1.5e-07; eager out 7.1e-05 state 1.5e-07)
+  h_s6_h16_b4     H=16  B=4    S=6 pages PASS (out 9.2e-05 state 1.6e-07; replay out 2.0e-04 state 1.6e-07; eager out 2.0e-04 state 1.6e-07)
+  h_s6_h16_b4     H=16  B=4    S=6 dense PASS (out 4.2e-05 state 1.6e-07; replay out 5.5e-05 state 1.6e-07; eager out 5.5e-05 state 1.6e-07)
+  h_s6_h16_b48    H=16  B=48   S=6 pages PASS (out 1.6e-05 state 1.6e-07; replay out 5.9e-05 state 1.6e-07; eager out 5.9e-05 state 1.6e-07)
+  h_d_h16_b512    H=16  B=512  S=1 pages PASS (out 3.7e-05 state 1.4e-07; replay out 4.0e-05 state 1.3e-07; eager out 4.0e-05 state 1.3e-07)
+  h_s3_h8_b96     H=8   B=96   S=3 pages PASS (out 3.8e-05 state 1.8e-07; replay out 4.2e-05 state 1.7e-07; eager out 4.2e-05 state 1.7e-07)
+  h_d_h8_b7       H=8   B=7    S=1 pages PASS (out 0.0e+00 state 1.2e-07; replay out 1.3e-06 state 1.2e-07; eager out 1.3e-06 state 1.2e-07)
+  h_d_h8_b7       H=8   B=7    S=1 dense PASS (out 5.7e-10 state 1.3e-07; replay out 0.0e+00 state 1.1e-07; eager out 0.0e+00 state 1.1e-07)
+  h_s8_h48_b12    H=48  B=12   S=8 pages PASS (out 2.7e-05 state 1.5e-07; replay out 1.9e-05 state 1.5e-07; eager out 1.9e-05 state 1.5e-07)
+  h_d_h96_b64     H=96  B=64   S=1 pages PASS (out 6.4e-05 state 1.2e-07; replay out 4.0e-05 state 1.2e-07; eager out 4.0e-05 state 1.2e-07)
+  h_s3_h96_b5     H=96  B=5    S=3 pages PASS (out 1.4e-06 state 1.4e-07; replay out 1.9e-05 state 1.4e-07; eager out 1.9e-05 state 1.4e-07)
+  h_s7_h12_b1     H=12  B=1    S=7 pages PASS (out 5.1e-04 state 1.6e-07; replay out 5.5e-05 state 1.5e-07; eager out 5.5e-05 state 1.5e-07)
+  h_s7_h12_b1     H=12  B=1    S=7 dense PASS (out 1.0e-04 state 1.4e-07; replay out 2.4e-05 state 1.6e-07; eager out 2.4e-05 state 1.6e-07)
+
+[gate] integration (prefill -> spec decode -> prefill on one pool)
+  PASS: prefill-1 out 4.1e-03 pool 3.7e-04; verify-1 out 1.7e-04 state 1.7e-07; verify-2 out 4.3e-05 state 1.6e-07; verify-3 out 5.1e-05 state 1.7e-07; prefill-2 out 4.1e-03 pool 3.6e-04; prefill-3 (prefix hit) out 4.2e-03 pool 3.6e-04
+
+[gate] co-tenant: another stream's kernel holds 3/4 of the CUs (all their LDS) for 4 s
+  decode s8_h12_b64 eager    PASS (finished 0 ms after launch beside the hog; out 2.3e-05 state 1.8e-07)
+  decode s8_h12_b64 graph    PASS (finished 0 ms after launch beside the hog; out 2.3e-05 state 1.8e-07)
+
+[gate] no regression, phase-1 prefill workloads (contiguous state, recorded vLLM latencies)
+  p_1x1k          30.7 us  vLLM(recorded)      62.9 us   2.048x  (out 3.2e-03 state 3.7e-04)
+  p_1x4k          55.5 us  vLLM(recorded)     122.2 us   2.202x  (out 4.3e-03 state 3.7e-04)
+  p_1x16k        161.0 us  vLLM(recorded)     398.8 us   2.477x  (out 4.3e-03 state 3.6e-04)
+  p_1x64k        556.8 us  vLLM(recorded)    1389.5 us   2.496x  (out 4.3e-03 state 3.6e-04)
+  p_4x4k         120.8 us  vLLM(recorded)     380.5 us   3.149x  (out 3.2e-03 state 2.9e-04)
+  p_8x2k         111.6 us  vLLM(recorded)     338.8 us   3.036x  (out 3.2e-03 state 2.9e-04)
+  p_16x1k        111.4 us  vLLM(recorded)     316.0 us   2.836x  (out 3.2e-03 state 2.9e-04)
+  p_32x512       114.4 us  vLLM(recorded)     320.2 us   2.800x  (out 3.3e-03 state 2.9e-04)
+  p_64x128        75.5 us  vLLM(recorded)     192.0 us   2.543x  (out 3.4e-03 state 2.9e-04)
+  p_mixed        104.8 us  vLLM(recorded)     491.4 us   4.687x  (out 4.3e-03 state 3.1e-04)
+
+[gate] no regression, phase-1 decode workloads (dense pools, recorded baselines)
+  d_k3_b1          13.40 us  best baseline(recorded)    16.28 us   1.215x
+  d_k3_b32         20.28 us  best baseline(recorded)    23.44 us   1.156x
+  d_k3_b128        45.36 us  best baseline(recorded)    54.44 us   1.200x
+  s4_k3_b1         14.64 us  best baseline(recorded)    25.04 us   1.710x
+  s4_k3_b16        22.20 us  best baseline(recorded)    39.88 us   1.796x
+  s4_k3_b64        54.84 us  best baseline(recorded)    87.08 us   1.588x
+  s8_k3_b1         15.52 us  best baseline(recorded)    32.48 us   2.093x
+  s8_k3_b16        30.76 us  best baseline(recorded)    58.36 us   1.897x
+  s8_k3_b64        89.68 us  best baseline(recorded)   147.52 us   1.645x
+  d_glm16_b1       13.40 us  best baseline(recorded)    18.80 us   1.403x
+  d_glm16_b64      33.52 us  best baseline(recorded)    51.04 us   1.523x
+  d_glm16_b256     98.56 us  best baseline(recorded)   135.80 us   1.378x
+  s6_glm16_b1      15.36 us  best baseline(recorded)    28.68 us   1.867x
+  s6_glm16_b16     30.96 us  best baseline(recorded)    53.68 us   1.734x
+  s6_glm16_b64     91.24 us  best baseline(recorded)   148.28 us   1.625x
+  d_glm8_b128      34.08 us  best baseline(recorded)    51.48 us   1.511x
+  s6_glm8_b32      31.12 us  best baseline(recorded)    53.60 us   1.722x
+  legacy prefill mean_vs_base = 2.827 (floor 0.932); legacy decode mean_vs_base = 1.592 (floor 1.500)
+
+========================================================================
+  prefill p12_loaded8k_0 3.04x, p12_loaded8k_1 3.35x, p12_loaded8k_2 2.49x, p12_loaded16k_0 3.02x, p12_loaded16k_1 4.06x
+          p12_loaded16k_2 5.05x, p12_light8k_0 2.65x, p12_light8k_1 2.41x, p12_light16k_0 2.29x, p12_light16k_1 2.22x
+          p96_loaded8k_0 3.59x, p96_loaded8k_1 3.19x, p96_light8k_0 3.08x
+  decode  s8_h12_b1 2.10x, s8_h12_b4 1.99x, s8_h12_b16 1.81x, s8_h12_b32 1.65x, s8_h12_b64 1.56x
+          s8_h12_b128 1.55x, d_h12_b64 1.07x, s8_h96_b1 1.94x, s8_h96_b8 1.62x, s8_h96_b32 1.83x
+  prefill_geomean_vs_vllm = 3.028   decode_geomean_vs_best_baseline = 1.686
+  mean_vs_base = 2.259 (sqrt(prefill geomean x decode geomean) over 13 + 10 serving workloads)
+========================================================================

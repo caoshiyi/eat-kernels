@@ -1,0 +1,10 @@
+# Versions the package was built and measured with (ROCm 7.2.0, Python 3.12.3, MI350X gfx950).
+# torch / triton-rocm: install the ROCm 7.2 builds from PyTorch's ROCm wheel index (pip --index-url ...) or AMD's
+# ROCm containers; other versions are untested (the decode build warns on a toolchain other than ROCm 7.2.0).
+torch==2.14.0+rocm7.2
+triton-rocm==3.8.0
+ninja==1.13.2
+numpy==2.5.3
+# benchmark only (vLLM prefill baseline's chunk-index helpers)
+flash-linear-attention==0.5.2
+fla-core==0.5.2
