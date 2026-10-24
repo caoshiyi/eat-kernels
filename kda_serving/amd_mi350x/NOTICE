@@ -1,7 +1,7 @@
 KDA kernels for Kimi-K3 serving on AMD Instinct MI350X
 Copyright 2026 the authors (see README.md, "Provenance")
 
-This product is licensed under the Apache License, Version 2.0 (LICENSE), except for the third-party files listed below,
+This package is licensed under the Apache License, Version 2.0 (../../LICENSE), except for the third-party files listed below,
 which keep their original licenses and copyright headers.
 
 -------------------------------------------------------------------------------------------------------------------------

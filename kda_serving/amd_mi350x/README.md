@@ -31,7 +31,7 @@ single long requests and 32-request batches, prefill with checkpoints and a carr
 both operators pass a correctness gate against fp64: 27 / 27 cases, prefill output within 0.17–0.28 % relative L2
 (FLA `chunk_kda` on the same inputs: 0.23–0.35 %) (`benchmark/real_gate/`). Per-workload ratios range from 2.2x to 5.0x (prefill) and from
 1.07x (plain decode, H 12 B 64) to 2.1x (speculative B = 1) (`docs/HANDOVER.md`, section 9). A release check from a
-fresh clone of this repository read 2.224–2.259 (prefill 3.02–3.03, decode 1.64–1.69) on a day when the live AITER
+fresh clone of this package read 2.224–2.259 (prefill 3.02–3.03, decode 1.64–1.69) on a day when the live AITER
 baseline ran faster on some workloads; the package's own latencies matched the handover's (`benchmark/README.md`).
 
 ## Requirements
@@ -43,7 +43,7 @@ warns on a ROCm other than 7.2.0. One GPU per process is the tested configuratio
 ## Integration
 
 ```python
-import sys; sys.path.insert(0, "<repo>/kda")
+import sys; sys.path.insert(0, "<eat-kernels>/kda_serving/amd_mi350x/kda")
 import kernel                                   # JIT-builds / loads the prefill extension (first time ~35-45 s, then cached under kda/prefill/build/)
 kernel.decode_warmup()                          # once per device at start-up, outside any graph capture (first time ~105 s of JIT, then 0.15 s)
 
@@ -105,6 +105,8 @@ definitions: `workloads/README.md`.
 
 ## Repository layout
 
+Paths below and in the other documents of this package are relative to `kda_serving/amd_mi350x/`.
+
 | path | what |
 |---|---|
 | `kda/` | the package as shipped: `kernel.py` (entry points), `prefill/` (HIP C++), `decode/` (HIP C++ + Python launchers, AITER Triton fallback; `decode/FINAL.md` = the decode kernel's design notes) |
@@ -119,8 +121,8 @@ definitions: `workloads/README.md`.
 The kernels were optimised and hardened by teams of AI agents (EAT) on one MI350X machine, in two phases: first on
 simplified interfaces (`amd_kda_mi350x` prefill, `amd_kda_decode_mi350x` decode), then on vLLM's production calling
 convention (this package). `kda/prefill/kernel.cu` started from vLLM's fused ROCm Kimi-K3 chunk kernel (its header is
-kept); the decode fallback is AITER's `fused_kda_decode`. Every number in this repository was measured on that machine.
+kept); the decode fallback is AITER's `fused_kda_decode`. Every number in this directory was measured on that machine.
 The source comments in `kda/` were written during that work and refer to internal notes and experiments not included
 here. Contact: Shiyi Cao (shicao@berkeley.edu).
 
-License: Apache-2.0 (`LICENSE`). Third-party code (vLLM, Apache-2.0; AITER, MIT) keeps its headers; see `NOTICE`.
+License: Apache-2.0 (`../../LICENSE`). Third-party code (vLLM, Apache-2.0; AITER, MIT) keeps its headers; see `NOTICE`.

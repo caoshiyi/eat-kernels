@@ -12,7 +12,7 @@ Requirements: one AMD Instinct MI350X (gfx950), ROCm 7.2.0 (`hipcc` on `PATH`), 
 AITER install is needed: the baseline kernels are vendored under `baselines/`.
 
 ```bash
-cd <repo>
+cd <eat-kernels>/kda_serving/amd_mi350x
 pip install -r requirements.txt               # or use an environment that already has these versions
 bash benchmark/build_baselines.sh             # builds the two vLLM HIP baselines (~20 s)
 ```
@@ -47,7 +47,7 @@ Any gate failure prints `GATE FAILURE: ...` and `mean_vs_base = 0.000`, exit sta
 
 Expected numbers (MI350X, ROCm 7.2.0):
 
-| | final handover: 10 officials, one GPU | 18 officials over 4 GPUs | release check from a fresh clone of this repo (5 officials, one GPU, 2026-10-13) |
+| | final handover: 10 officials, one GPU | 18 officials over 4 GPUs | release check from a fresh clone of this package (5 officials, one GPU, 2026-10-13) |
 |---|---|---|---|
 | `mean_vs_base` | 2.267 (2.263–2.271, sd 0.003) | 2.261–2.275 | 2.224–2.259 |
 | prefill geomean vs vLLM fused ROCm prefill | 3.038 (3.035–3.043) | 3.035–3.055 | 3.017–3.028 |

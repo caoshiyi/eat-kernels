@@ -3,14 +3,14 @@
 This is Part A (sections 1-10) of the final handover written at the end of the optimisation run, plus the final-numbers
 section B0 of the operator part. Content unchanged except as noted here.
 
-- **Package** = `kda/` in this repository (`kda/kernel.py`, `kda/prefill/`, `kda/decode/`), byte-identical to the shipped
+- **Package** = `kda/` in this package (`kda/kernel.py`, `kda/prefill/`, `kda/decode/`), byte-identical to the shipped
   snapshot `33_claim_fill_any_mode`. Snapshot labels such as `14_h0s_twx`, `27_kernarg_lines`, `31_flag_early_clock`,
   `32_health_sticky_claim_heal` and "package NN" name earlier package versions of the run; they are version labels, not files.
 - Paths below are relative to `kda/` when they name package sources (`prefill/kernel.cu`, `decode/kernel_v15_a.py`, ...).
   The eval is `benchmark/eval_kda_mi350x.py` (originally `tools/eval_amd_kda_prod_mi350x.py`), the contract `CONTRACT.md`
   (originally `program.md`).
 - **[internal]** replaces a reference to a test tool, log, patch or note of the development workspace (per-role work
-  directories, the team board, the results table) that is not part of this repository. The measurements quoted next to
+  directories, the team board, the results table) that is not part of this package. The measurements quoted next to
   such a marker were produced by it; the tools and logs can be provided on request.
 - Role names (`release_closer`, the auditor, gatekeepers, builders) are agents of the team that built and tested the package.
 - "HIP 0 / 2 / 3 / 6" are the four MI350X GPUs of the development machine (HIP numbering). Every number was measured on
@@ -354,7 +354,7 @@ where the fallback kernel's cache lives.
 ## 7. What was tested, and how to rerun it
 
 The tests below ran with the team's internal tools ([internal]) on the development machine, every GPU command under
-its GPU scheduler with a timeout. What this repository contains for re-running them: the official eval and its gates,
+its GPU scheduler with a timeout. What this package contains for re-running them: the official eval and its gates,
 the smoke test and the workload tables (`benchmark/README.md`); the stress suites, soaks, probes and fault-injection
 builds named below are not included.
 
