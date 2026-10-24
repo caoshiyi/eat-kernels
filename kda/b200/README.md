@@ -7,7 +7,7 @@ TMA, inline PTX) with Python host glue. On the 26 serving workloads below it is 
 (geomean) with bf16 checkpoint rows and 2.40x with fp32 rows, and **3.39x** on the six Int21 workloads (H = 64 / 96,
 plain calls), while doing strictly more work than FlashKDA in the serving set (pool gather / scatter and checkpoint
 writes). This is the run's final production kernel; the benchmark-track kernel for plain calls (3.44x on Int21) is
-in [`../b200_int21`](../b200_int21).
+in [`../b200_plain`](../b200_plain).
 
 ## Use
 

@@ -6,7 +6,7 @@ head dim 128, varlen batches), written in HIP C++. On the 10 production-shaped w
 `chunk_kda`**, with output and final state within 5e-3 relative L2 of an fp32 reference.
 
 This is the phase-1 kernel on a simplified interface. The production version on vLLM's calling convention
-(paged state pool, prefix-cache checkpoints, plus fused decode) is `kda_serving/amd_mi350x`.
+(paged state pool, prefix-cache checkpoints, plus fused decode) is [`../mi350x`](../mi350x).
 
 ## Use
 

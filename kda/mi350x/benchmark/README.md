@@ -12,7 +12,7 @@ Requirements: one AMD Instinct MI350X (gfx950), ROCm 7.2.0 (`hipcc` on `PATH`), 
 AITER install is needed: the baseline kernels are vendored under `baselines/`.
 
 ```bash
-cd <eat-kernels>/kda_serving/amd_mi350x
+cd <eat-kernels>/kda/mi350x
 pip install -r requirements.txt               # or use an environment that already has these versions
 bash benchmark/build_baselines.sh             # builds the two vLLM HIP baselines (~20 s)
 ```

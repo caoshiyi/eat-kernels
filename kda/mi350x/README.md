@@ -43,7 +43,7 @@ warns on a ROCm other than 7.2.0. One GPU per process is the tested configuratio
 ## Integration
 
 ```python
-import sys; sys.path.insert(0, "<eat-kernels>/kda_serving/amd_mi350x/kda")
+import sys; sys.path.insert(0, "<eat-kernels>/kda/mi350x/kda")
 import kernel                                   # JIT-builds / loads the prefill extension (first time ~35-45 s, then cached under kda/prefill/build/)
 kernel.decode_warmup()                          # once per device at start-up, outside any graph capture (first time ~105 s of JIT, then 0.15 s)
 
@@ -105,7 +105,7 @@ definitions: `workloads/README.md`.
 
 ## Repository layout
 
-Paths below and in the other documents of this package are relative to `kda_serving/amd_mi350x/`.
+Paths below and in the other documents of this package are relative to `kda/mi350x/`.
 
 | path | what |
 |---|---|

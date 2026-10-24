@@ -6,14 +6,19 @@ directly. Each kernel is discovered and optimized by agent teams (EAT), and ship
 - the recorded baseline numbers and the hardware it was tuned on;
 - known limitations, and a link to the full evolution traces.
 
-| op | hardware | directory | vs best prior kernel | status |
-|---|---|---|---|---|
-| KDA prefill (Kimi-K3, H=12, D=128, varlen) | AMD MI350X (gfx950) | `kda_prefill/amd_mi350x` | 3.0x vs vLLM ROCm, 7.3x vs fla Triton | released |
-| KDA prefill + fused decode / speculative verify (Kimi-K3 serving, vLLM ROCm calling convention: paged state pool, checkpoints, HIP graphs) | AMD MI350X (gfx950) | `kda_serving/amd_mi350x` | prefill 3.04x vs vLLM ROCm, decode 1.69x vs the faster of AITER / vLLM HIP | released |
-| KDA prefill (Kimi-K3 serving, H=12/16, D=128, varlen, state pool + checkpoints) | NVIDIA B200 (sm_100a) | `kda_prefill/b200` | 2.57x vs FlashKDA (serving, bf16 checkpoints; 2.40x fp32), 3.39x (Int21, H=64/96) | released |
-| KDA forward, plain calls (benchmark track, H=64/96, D=128, varlen) | NVIDIA B200 (sm_100a) | `kda_prefill/b200_int21` | 3.44x vs FlashKDA (Int21) | released |
+## KDA (Kimi Delta Attention), head dim 128, varlen batches
 
-Layout: `<op>/<hardware>/` (`kda_serving/` = prefill and decode together, as a serving engine calls them) holds `csrc/` (or a Python DSL source), a Python entry point, `reference.py`, `bench.py`,
-tests, `README.md` (API, results, limitations, provenance).
+| directory | hardware | interface | ops | vs best prior kernel |
+|---|---|---|---|---|
+| [`kda/mi350x`](kda/mi350x) | AMD MI350X (gfx950) | **serving**: vLLM's ROCm Kimi-K3 calling convention (paged state pool, prefix-cache checkpoints, HIP graphs) | prefill + fused decode / speculative verify | prefill 3.04x vs vLLM ROCm; decode 1.69x vs the faster of AITER / vLLM HIP |
+| [`kda/b200`](kda/b200) | NVIDIA B200 (sm_100a) | **serving**: paged state pool, prefix-cache checkpoints, one CUDA graph across batch layouts; plain calls too | prefill | 2.57x vs FlashKDA (serving set, bf16 checkpoints; 2.40x fp32), 3.39x (Int21, H=64/96) |
+| [`kda/mi350x_plain`](kda/mi350x_plain) | AMD MI350X (gfx950) | plain calls (fla `chunk_kda` convention, contiguous state) | prefill | 3.0x vs vLLM ROCm, 7.3x vs fla Triton (H=12) |
+| [`kda/b200_plain`](kda/b200_plain) | NVIDIA B200 (sm_100a) | plain calls (benchmark track) | forward | 3.44x vs FlashKDA (Int21, H=64/96) |
+
+For an inference engine, use the **serving** kernel of your hardware. The `_plain` kernels are the earlier or
+benchmark-track versions on simpler interfaces, kept with their own results.
+
+Layout: `<op>/<hardware>[_<variant>]/`. Each directory holds the sources, a Python entry point, `reference.py`, a
+benchmark, tests and a `README.md` (API, results, limitations, provenance).
 
 License: Apache-2.0 (see NOTICE for third-party code).
