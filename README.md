@@ -13,7 +13,6 @@
   <a href="https://github.com/caoshiyi/EAT"><img alt="EAT" src="https://img.shields.io/badge/Harness-EAT-E8A12E?style=flat-square&logo=github&logoColor=white&labelColor=0E1A2B"></a>
   <a href="https://huggingface.co/datasets/eva98/eat-evolution-traces"><img alt="Traces" src="https://img.shields.io/badge/%F0%9F%A4%97%20Traces-agent%20transcripts-E8A12E?style=flat-square&labelColor=0E1A2B"></a>
   <a href="https://huggingface.co/datasets/eva98/eat-gym"><img alt="EAT Gym" src="https://img.shields.io/badge/%F0%9F%A4%97%20EAT%20Gym-tasks-E8A12E?style=flat-square&labelColor=0E1A2B"></a>
-  <a href="https://github.com/caoshiyi/eat-robodojo-policy"><img alt="Robot policy" src="https://img.shields.io/badge/Policy-eat--robodojo--policy-E8A12E?style=flat-square&logo=github&logoColor=white&labelColor=0E1A2B"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-Apache--2.0-5C7FA3?style=flat-square&labelColor=0E1A2B"></a>
 </p>
 
