@@ -2,7 +2,7 @@
 
 Kimi Delta Attention (chunked gated delta rule with per-channel gates) prefill for Kimi-K3 at TP8 (H = 12 heads,
 head dim 128, varlen batches), written in HIP C++. On the 10 production-shaped workloads below it is
-**3.01x faster than vLLM's hand-written ROCm KDA kernels** (mean of three independent evals) and **7.3x faster than flash-linear-attention's Triton
+**3.01× faster than vLLM's hand-written ROCm KDA kernels** (mean of three independent evals) and **7.3× faster than flash-linear-attention's Triton
 `chunk_kda`**, with output and final state within 5e-3 relative L2 of an fp32 reference.
 
 This is the phase-1 kernel on a simplified interface. The production version on vLLM's calling convention
@@ -33,20 +33,20 @@ Median of 50 runs, Infinity Cache flushed before each; latency includes the laun
 
 | workload | sequence lengths | this (ms) | vLLM ROCm (ms) | vs vLLM | vs fla |
 |---|---|---|---|---|---|
-| p_1x1k | 1024 | 0.0302 | 0.0629 | 2.09x | 11.7x |
-| p_1x4k | 4096 | 0.0504 | 0.1222 | 2.42x | 9.1x |
-| p_1x16k | 16384 | 0.1522 | 0.3988 | 2.62x | 7.3x |
-| p_1x64k | 65536 | 0.5331 | 1.3895 | 2.61x | 8.2x |
-| p_4x4k | 4096 x 4 | 0.1137 | 0.3805 | 3.35x | 6.0x |
-| p_8x2k | 2048 x 8 | 0.1041 | 0.3388 | 3.25x | 6.0x |
-| p_16x1k | 1024 x 16 | 0.1025 | 0.3160 | 3.08x | 6.2x |
-| p_32x512 | 512 x 32 | 0.1084 | 0.3202 | 2.96x | 5.7x |
-| p_64x128 | 128 x 64 | 0.0666 | 0.1920 | 2.88x | 6.5x |
-| p_mixed | 8192, 1024, 777, 512, 256, 130, 64, 17 | 0.1062 | 0.4914 | 4.63x | 6.8x |
-| **mean** | | | | **2.99x** | **7.3x** |
+| p_1x1k | 1024 | 0.0302 | 0.0629 | 2.09× | 11.7× |
+| p_1x4k | 4096 | 0.0504 | 0.1222 | 2.42× | 9.1× |
+| p_1x16k | 16384 | 0.1522 | 0.3988 | 2.62× | 7.3× |
+| p_1x64k | 65536 | 0.5331 | 1.3895 | 2.61× | 8.2× |
+| p_4x4k | 4096 × 4 | 0.1137 | 0.3805 | 3.35× | 6.0× |
+| p_8x2k | 2048 × 8 | 0.1041 | 0.3388 | 3.25× | 6.0× |
+| p_16x1k | 1024 × 16 | 0.1025 | 0.3160 | 3.08× | 6.2× |
+| p_32x512 | 512 × 32 | 0.1084 | 0.3202 | 2.96× | 5.7× |
+| p_64x128 | 128 × 64 | 0.0666 | 0.1920 | 2.88× | 6.5× |
+| p_mixed | 8192, 1024, 777, 512, 256, 130, 64, 17 | 0.1062 | 0.4914 | 4.63× | 6.8× |
+| **mean** | | | | **2.99×** | **7.3×** |
 
 The table is the run's last official eval. I re-measured the kernel independently on an idle GPU with three full
-evals: 2.975x, 3.018x and 3.037x (mean 3.01x). The slow-decay correctness test (`test_slowdecay.py`) passes.
+evals: 2.975×, 3.018× and 3.037× (mean 3.01×). The slow-decay correctness test (`test_slowdecay.py`) passes.
 
 ## Limitations
 

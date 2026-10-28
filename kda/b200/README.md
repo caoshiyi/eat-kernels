@@ -3,10 +3,10 @@
 Kimi Delta Attention (chunked gated delta rule with per-channel gates) forward / chunked prefill for Kimi-K3
 serving on B200: H = 12 (TP8) or 16 heads per GPU, head dim 128, varlen batches, a paged state pool, prefix-cache
 checkpoints every 64 tokens, and one CUDA graph replayed across batch layouts. Written in CUDA C++ (tcgen05 / TMEM /
-TMA, inline PTX) with Python host glue. On the 26 serving workloads below it is **2.57x faster than FlashKDA**
-(geomean) with bf16 checkpoint rows and 2.40x with fp32 rows, and **3.39x** on the six Int21 workloads (H = 64 / 96,
+TMA, inline PTX) with Python host glue. On the 26 serving workloads below it is **2.57× faster than FlashKDA**
+(geomean) with bf16 checkpoint rows and 2.40× with fp32 rows, and **3.39×** on the six Int21 workloads (H = 64 / 96,
 plain calls), while doing strictly more work than FlashKDA in the serving set (pool gather / scatter and checkpoint
-writes). This is the run's final production kernel; the benchmark-track kernel for plain calls (3.44x on Int21) is
+writes). This is the run's final production kernel; the benchmark-track kernel for plain calls (3.44× on Int21) is
 in [`../b200_plain`](../b200_plain).
 
 ## Use
@@ -72,48 +72,48 @@ state) before timing and after an in-place refill.
 
 | measurement | serving, bf16 checkpoints | serving, fp32 checkpoints | Int21 |
 |---|---|---|---|
-| `bench.py --ckpt-dtype bf16` (seed 16708478) and `bench.py` (seed 6614966) | 2.573x | 2.403x | 3.392x / 3.387x |
-| the run's official evaluation (all gates), pointed at this directory | 2.585x | 2.407x | 3.392x |
+| `bench.py --ckpt-dtype bf16` (seed 16708478) and `bench.py` (seed 6614966) | 2.573× | 2.403× | 3.392× / 3.387× |
+| the run's official evaluation (all gates), pointed at this directory | 2.585× | 2.407× | 3.392× |
 
 Per workload (FlashKDA time from the bf16 run; FlashKDA writes no checkpoints, so its time does not depend on the
 checkpoint dtype):
 
 | workload | H | sequence lengths | FlashKDA (ms) | bf16 ckpt (ms) | speedup | fp32 ckpt (ms) | speedup |
 |---|---|---|---|---|---|---|---|
-| long-1x8192 | 12 | 8192 | 0.7782 | 0.1313 | 5.93x | 0.1432 | 5.43x |
-| long-1x32768 | 12 | 32768 | 3.0467 | 0.3645 | 8.36x | 0.4035 | 7.55x |
-| long-2x8192 | 12 | 8192 x 2 | 0.8187 | 0.2239 | 3.66x | 0.2504 | 3.27x |
-| long-3000+13384 | 12 | 3000, 13384 | 1.2684 | 0.2363 | 5.37x | 0.2555 | 4.97x |
-| long-4x4096 | 12 | 4096 x 4 | 0.4596 | 0.2272 | 2.02x | 0.2473 | 1.86x |
-| long-8x1088 | 12 | 1088 x 8 | 0.1617 | 0.0824 | 1.96x | 0.0886 | 1.83x |
-| resid-4x64 | 12 | 64 x 4 | 0.0297 | 0.0165 | 1.80x | 0.0168 | 1.77x |
-| resid-16x64 | 12 | 64 x 16 | 0.0421 | 0.0276 | 1.53x | 0.0283 | 1.48x |
-| resid-64x64 | 12 | 64 x 64 | 0.1062 | 0.0614 | 1.73x | 0.0628 | 1.69x |
-| resid-16x256 | 12 | 256 x 16 | 0.0819 | 0.0554 | 1.48x | 0.0576 | 1.42x |
-| resid-16x17..255 | 12 | 109 x 16 | 0.0579 | 0.0381 | 1.52x | 0.0379 | 1.53x |
-| agent8 | 12 | 256, 512, 900, 1600, 1600, 2400, 4000, 8700 | 0.8854 | 0.2891 | 3.06x | 0.3123 | 2.84x |
-| agent16 | 12 | the agent8 lengths x 2 | 1.3225 | 0.5462 | 2.42x | 0.6368 | 2.08x |
-| long-1x8192 | 16 | 8192 | 0.7905 | 0.1530 | 5.17x | 0.1644 | 4.81x |
-| long-1x32768 | 16 | 32768 | 3.0952 | 0.4510 | 6.86x | 0.5016 | 6.17x |
-| long-2x8192 | 16 | 8192 x 2 | 0.8443 | 0.3033 | 2.78x | 0.3201 | 2.64x |
-| long-3000+13384 | 16 | 3000, 13384 | 1.2987 | 0.2824 | 4.60x | 0.3114 | 4.17x |
-| long-4x4096 | 16 | 4096 x 4 | 0.4851 | 0.2551 | 1.90x | 0.2841 | 1.71x |
-| long-8x1088 | 16 | 1088 x 8 | 0.1755 | 0.0847 | 2.07x | 0.0904 | 1.94x |
-| resid-4x64 | 16 | 64 x 4 | 0.0305 | 0.0181 | 1.69x | 0.0183 | 1.67x |
-| resid-16x64 | 16 | 64 x 16 | 0.0446 | 0.0286 | 1.56x | 0.0290 | 1.53x |
-| resid-64x64 | 16 | 64 x 64 | 0.1345 | 0.0700 | 1.92x | 0.0741 | 1.82x |
-| resid-16x256 | 16 | 256 x 16 | 0.0900 | 0.0558 | 1.61x | 0.0586 | 1.53x |
-| resid-16x17..255 | 16 | 109 x 16 | 0.0621 | 0.0385 | 1.62x | 0.0395 | 1.57x |
-| agent8 | 16 | 256, 512, 900, 1600, 1600, 2400, 4000, 8700 | 0.9172 | 0.3563 | 2.57x | 0.3922 | 2.34x |
-| agent16 | 16 | the agent8 lengths x 2 | 1.3874 | 0.5465 | 2.54x | 0.6364 | 2.18x |
-| **serving geomean** | | | | | **2.573x** | | **2.403x** |
-| Int21 fixed | 96 | 8192 | 1.0365 | 0.3034 | 3.42x | 0.3036 | 3.41x |
-| Int21 mixed_varlen | 96 | 1300, 547, 2048, 963, 271, 3063 | 0.9117 | 0.2492 | 3.66x | 0.2522 | 3.63x |
-| Int21 uniform_varlen | 96 | 1024 x 8 | 0.7406 | 0.2524 | 2.93x | 0.2541 | 2.92x |
-| Int21 fixed | 64 | 8192 | 0.9391 | 0.2394 | 3.92x | 0.2413 | 3.89x |
-| Int21 mixed_varlen | 64 | 1300, 547, 2048, 963, 271, 3063 | 0.6841 | 0.1836 | 3.73x | 0.1817 | 3.77x |
-| Int21 uniform_varlen | 64 | 1024 x 8 | 0.5023 | 0.1767 | 2.84x | 0.1768 | 2.85x |
-| **Int21 geomean** | | | | | **3.392x** | | **3.387x** |
+| long-1x8192 | 12 | 8192 | 0.7782 | 0.1313 | 5.93× | 0.1432 | 5.43× |
+| long-1x32768 | 12 | 32768 | 3.0467 | 0.3645 | 8.36× | 0.4035 | 7.55× |
+| long-2x8192 | 12 | 8192 × 2 | 0.8187 | 0.2239 | 3.66× | 0.2504 | 3.27× |
+| long-3000+13384 | 12 | 3000, 13384 | 1.2684 | 0.2363 | 5.37× | 0.2555 | 4.97× |
+| long-4x4096 | 12 | 4096 × 4 | 0.4596 | 0.2272 | 2.02× | 0.2473 | 1.86× |
+| long-8x1088 | 12 | 1088 × 8 | 0.1617 | 0.0824 | 1.96× | 0.0886 | 1.83× |
+| resid-4x64 | 12 | 64 × 4 | 0.0297 | 0.0165 | 1.80× | 0.0168 | 1.77× |
+| resid-16x64 | 12 | 64 × 16 | 0.0421 | 0.0276 | 1.53× | 0.0283 | 1.48× |
+| resid-64x64 | 12 | 64 × 64 | 0.1062 | 0.0614 | 1.73× | 0.0628 | 1.69× |
+| resid-16x256 | 12 | 256 × 16 | 0.0819 | 0.0554 | 1.48× | 0.0576 | 1.42× |
+| resid-16x17..255 | 12 | 109 × 16 | 0.0579 | 0.0381 | 1.52× | 0.0379 | 1.53× |
+| agent8 | 12 | 256, 512, 900, 1600, 1600, 2400, 4000, 8700 | 0.8854 | 0.2891 | 3.06× | 0.3123 | 2.84× |
+| agent16 | 12 | the agent8 lengths × 2 | 1.3225 | 0.5462 | 2.42× | 0.6368 | 2.08× |
+| long-1x8192 | 16 | 8192 | 0.7905 | 0.1530 | 5.17× | 0.1644 | 4.81× |
+| long-1x32768 | 16 | 32768 | 3.0952 | 0.4510 | 6.86× | 0.5016 | 6.17× |
+| long-2x8192 | 16 | 8192 × 2 | 0.8443 | 0.3033 | 2.78× | 0.3201 | 2.64× |
+| long-3000+13384 | 16 | 3000, 13384 | 1.2987 | 0.2824 | 4.60× | 0.3114 | 4.17× |
+| long-4x4096 | 16 | 4096 × 4 | 0.4851 | 0.2551 | 1.90× | 0.2841 | 1.71× |
+| long-8x1088 | 16 | 1088 × 8 | 0.1755 | 0.0847 | 2.07× | 0.0904 | 1.94× |
+| resid-4x64 | 16 | 64 × 4 | 0.0305 | 0.0181 | 1.69× | 0.0183 | 1.67× |
+| resid-16x64 | 16 | 64 × 16 | 0.0446 | 0.0286 | 1.56× | 0.0290 | 1.53× |
+| resid-64x64 | 16 | 64 × 64 | 0.1345 | 0.0700 | 1.92× | 0.0741 | 1.82× |
+| resid-16x256 | 16 | 256 × 16 | 0.0900 | 0.0558 | 1.61× | 0.0586 | 1.53× |
+| resid-16x17..255 | 16 | 109 × 16 | 0.0621 | 0.0385 | 1.62× | 0.0395 | 1.57× |
+| agent8 | 16 | 256, 512, 900, 1600, 1600, 2400, 4000, 8700 | 0.9172 | 0.3563 | 2.57× | 0.3922 | 2.34× |
+| agent16 | 16 | the agent8 lengths × 2 | 1.3874 | 0.5465 | 2.54× | 0.6364 | 2.18× |
+| **serving geomean** | | | | | **2.573×** | | **2.403×** |
+| Int21 fixed | 96 | 8192 | 1.0365 | 0.3034 | 3.42× | 0.3036 | 3.41× |
+| Int21 mixed_varlen | 96 | 1300, 547, 2048, 963, 271, 3063 | 0.9117 | 0.2492 | 3.66× | 0.2522 | 3.63× |
+| Int21 uniform_varlen | 96 | 1024 × 8 | 0.7406 | 0.2524 | 2.93× | 0.2541 | 2.92× |
+| Int21 fixed | 64 | 8192 | 0.9391 | 0.2394 | 3.92× | 0.2413 | 3.89× |
+| Int21 mixed_varlen | 64 | 1300, 547, 2048, 963, 271, 3063 | 0.6841 | 0.1836 | 3.73× | 0.1817 | 3.77× |
+| Int21 uniform_varlen | 64 | 1024 × 8 | 0.5023 | 0.1767 | 2.84× | 0.1768 | 2.85× |
+| **Int21 geomean** | | | | | **3.392×** | | **3.387×** |
 
 (The eval names the 16-sequence residual workload "17..255"; its generator re-seeds per draw, so all 16 lengths are 109.)
 
@@ -178,9 +178,9 @@ of the same sources and checked with the evaluation and tests above.
 The starting point was the first SM100-family KDA prefill kernels in FlashInfer (the CAKE team's `flashkda_*` M64 /
 M128 fused kernels, FlashInfer snapshot of Aug 13, 2026, Apache-2.0); the derived kernel files keep their NVIDIA
 copyright headers (see NOTICE). An EAT supervisor-evolved agent team rewrote and extended them in three phases on
-one git branch: phase 1 optimized plain calls on the six Int21 workloads (Oct 7-10, 2026: from about 2x for the
-FlashInfer kernels to 3.48x over FlashKDA), phase 2 adapted the kernel to serving (Oct 10-13: 2.10x -> 2.41x on the
-serving set), and phase 3 (Oct 14-15) added the aligned Int21 build and bf16 checkpoint rows (2.41x -> 2.58x). It
+one git branch: phase 1 optimized plain calls on the six Int21 workloads (Oct 7-10, 2026: from about 2× for the
+FlashInfer kernels to 3.48× over FlashKDA), phase 2 adapted the kernel to serving (Oct 10-13: 2.10× -> 2.41× on the
+serving set), and phase 3 (Oct 14-15) added the aligned Int21 build and bf16 checkpoint rows (2.41× -> 2.58×). It
 was a clean-room run: the agents had no network access, and no access to FlashInfer's KDA kernels newer than that
 snapshot or to any other team's KDA kernels.
 

@@ -22,15 +22,15 @@ decode / speculative-verify steps; baselines timed live on the same inputs; all 
 
 | | final package, 10 officials on one GPU | 18 officials over 4 GPUs |
 |---|---|---|
-| prefill, geomean vs vLLM's fused ROCm Kimi-K3 prefill | **3.04x** (3.035–3.043) | 3.035–3.055 |
-| decode, geomean vs the faster of AITER `fused_kda_decode` / vLLM's HIP decode | **1.69x** (1.684–1.699) | 1.678–1.699 |
+| prefill, geomean vs vLLM's fused ROCm Kimi-K3 prefill | **3.04×** (3.035–3.043) | 3.035–3.055 |
+| decode, geomean vs the faster of AITER `fused_kda_decode` / vLLM's HIP decode | **1.69×** (1.684–1.699) | 1.678–1.699 |
 | `mean_vs_base` = sqrt(prefill × decode) | **2.267** (2.263–2.271) | 2.261–2.275 |
 
 Gates over 40 new seeds (a full eval each): 0 failures. On real activations (Kimi-Linear-48B on GSM8K / MATH-500, H = 12 / 64 / 96,
 single long requests and 32-request batches, prefill with checkpoints and a carried state, plain and speculative decode)
 both operators pass a correctness gate against fp64: 27 / 27 cases, prefill output within 0.17–0.28 % relative L2
-(FLA `chunk_kda` on the same inputs: 0.23–0.35 %) (`benchmark/real_gate/`). Per-workload ratios range from 2.2x to 5.0x (prefill) and from
-1.07x (plain decode, H 12 B 64) to 2.1x (speculative B = 1) (`docs/HANDOVER.md`, section 9). A release check from a
+(FLA `chunk_kda` on the same inputs: 0.23–0.35 %) (`benchmark/real_gate/`). Per-workload ratios range from 2.2× to 5.0× (prefill) and from
+1.07× (plain decode, H 12 B 64) to 2.1× (speculative B = 1) (`docs/HANDOVER.md`, section 9). A release check from a
 fresh clone of this package read 2.224–2.259 (prefill 3.02–3.03, decode 1.64–1.69) on a day when the live AITER
 baseline ran faster on some workloads; the package's own latencies matched the handover's (`benchmark/README.md`).
 
@@ -85,7 +85,7 @@ Key caller rules (full list with reasons: `docs/HANDOVER.md`, section 2):
    workgroups hold most of each CU's LDS; a speculative decode workgroup is not dispatched until they leave. Measured:
    H 12 B 1 S 8 15 µs alone, 364 µs beside our H 96 prefill. One stream for prefill and decode (the normal serial
    engine step) avoids it; otherwise capture latency-critical decode in `decode_cotenant_mode("lds_free")` (AITER path,
-   no LDS, about 0.57x of default speed when alone).
+   no LDS, about 0.57× of default speed when alone).
 2. **A host tensor passed to `prefill()` is a device fault, not an exception** (P7): `state_indices`,
    `has_initial_state`, `checkpoint_state_indices` or `A_log` on the CPU raises an illegal memory access and the
    process's device context is lost. The engine wrapper must assert `t.is_cuda`. Decode checks this (`TypeError`).
@@ -93,7 +93,7 @@ Key caller rules (full list with reasons: `docs/HANDOVER.md`, section 2):
    gate: lowest reading 1.559 on the slowest of four GPUs (about 4 % margin). A heavily oversubscribed host on a slow GPU
    is the realistic way to fail it.
 4. Prefill relay path: fp16 intermediates. Values above ~6.5e4 are recomputed in fp32 (correct, but a latency cliff);
-   whole heads below ~1e-5 lose relative accuracy (P1 / P2). `KDA_RELAY_OFF=1` avoids both at about 2.4x slower prefill.
+   whole heads below ~1e-5 lose relative accuracy (P1 / P2). `KDA_RELAY_OFF=1` avoids both at about 2.4× slower prefill.
 5. MI350X / ROCm 7.2.0 only; one GPU per process tested (a two-GPU process is untested, `docs/HANDOVER.md` section 8).
 
 ## Validate

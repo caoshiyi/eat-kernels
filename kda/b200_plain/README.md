@@ -2,9 +2,9 @@
 
 Kimi Delta Attention (chunked gated delta rule with per-channel gates) forward for plain calls: initial state in,
 output and final state out, varlen batches, head dim 128. Written in CUDA C++ (tcgen05 / TMEM / TMA, inline PTX) with
-Python host glue. On the six Int21 workloads (H = 64 / 96, 8192 tokens) it is **3.44x faster than FlashKDA**
+Python host glue. On the six Int21 workloads (H = 64 / 96, 8192 tokens) it is **3.44× faster than FlashKDA**
 (geomean). For serving (state pool, prefix-cache checkpoints, graph-safe dynamic layouts) use the production
-kernel in [`../b200`](../b200), which reaches 3.39x on the same workloads.
+kernel in [`../b200`](../b200), which reaches 3.39× on the same workloads.
 
 ## Use
 
@@ -40,17 +40,17 @@ One `bench.py` run (seed 2984520):
 
 | workload | H | sequence lengths | FlashKDA (ms) | this (ms) | speedup |
 |---|---|---|---|---|---|
-| fixed | 96 | 8192 | 1.0372 | 0.2976 | 3.49x |
-| mixed_varlen | 96 | 1300, 547, 2048, 963, 271, 3063 | 0.9163 | 0.2452 | 3.74x |
-| uniform_varlen | 96 | 1024 x 8 | 0.7404 | 0.2511 | 2.95x |
-| fixed | 64 | 8192 | 0.9402 | 0.2422 | 3.88x |
-| mixed_varlen | 64 | 1300, 547, 2048, 963, 271, 3063 | 0.6856 | 0.1784 | 3.84x |
-| uniform_varlen | 64 | 1024 x 8 | 0.5027 | 0.1740 | 2.89x |
-| **Int21 geomean** | | | | | **3.439x** |
+| fixed | 96 | 8192 | 1.0372 | 0.2976 | 3.49× |
+| mixed_varlen | 96 | 1300, 547, 2048, 963, 271, 3063 | 0.9163 | 0.2452 | 3.74× |
+| uniform_varlen | 96 | 1024 × 8 | 0.7404 | 0.2511 | 2.95× |
+| fixed | 64 | 8192 | 0.9402 | 0.2422 | 3.88× |
+| mixed_varlen | 64 | 1300, 547, 2048, 963, 271, 3063 | 0.6856 | 0.1784 | 3.84× |
+| uniform_varlen | 64 | 1024 × 8 | 0.5027 | 0.1740 | 2.89× |
+| **Int21 geomean** | | | | | **3.439×** |
 
 The run's phase-1 official evaluation (the version at the tag: Int21 timing plus correctness checks against the
 fp64 reference, probes off the timed distribution, trained-gate and Kimi-Linear real-workload gates) passes every
-check on this directory and scores **3.428x**; in the run, the same kernel scored 3.446x when it was promoted.
+check on this directory and scores **3.428×**; in the run, the same kernel scored 3.446× when it was promoted.
 
 ## Limitations
 

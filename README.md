@@ -27,10 +27,10 @@ and optimized by agent teams evolved by [EAT](https://github.com/caoshiyi/EAT), 
 
 | directory | hardware | interface | ops | vs best prior kernel |
 |---|---|---|---|---|
-| [`kda/mi350x`](kda/mi350x) | AMD MI350X (gfx950) | **serving**: vLLM's ROCm Kimi-K3 calling convention (paged state pool, prefix-cache checkpoints, HIP graphs) | prefill + fused decode / speculative verify | prefill 3.04x vs vLLM ROCm; decode 1.69x vs the faster of AITER / vLLM HIP |
-| [`kda/b200`](kda/b200) | NVIDIA B200 (sm_100a) | **serving**: paged state pool, prefix-cache checkpoints, one CUDA graph across batch layouts; plain calls too | prefill | 2.57x vs FlashKDA (serving set, bf16 checkpoints; 2.40x fp32), 3.39x (Int21, H=64/96) |
-| [`kda/mi350x_plain`](kda/mi350x_plain) | AMD MI350X (gfx950) | plain calls (fla `chunk_kda` convention, contiguous state) | prefill | 3.01x vs vLLM ROCm, 7.3x vs fla Triton (H=12) |
-| [`kda/b200_plain`](kda/b200_plain) | NVIDIA B200 (sm_100a) | plain calls (benchmark track) | forward | 3.44x vs FlashKDA (Int21, H=64/96) |
+| [`kda/mi350x`](kda/mi350x) | AMD MI350X (gfx950) | **serving**: vLLM's ROCm Kimi-K3 calling convention (paged state pool, prefix-cache checkpoints, HIP graphs) | prefill + fused decode / speculative verify | prefill 3.04× vs vLLM ROCm; decode 1.69× vs the faster of AITER / vLLM HIP |
+| [`kda/b200`](kda/b200) | NVIDIA B200 (sm_100a) | **serving**: paged state pool, prefix-cache checkpoints, one CUDA graph across batch layouts; plain calls too | prefill | 2.57× vs FlashKDA (serving set, bf16 checkpoints; 2.40× fp32), 3.39× (Int21, H=64/96) |
+| [`kda/mi350x_plain`](kda/mi350x_plain) | AMD MI350X (gfx950) | plain calls (fla `chunk_kda` convention, contiguous state) | prefill | 3.01× vs vLLM ROCm, 7.3× vs fla Triton (H=12) |
+| [`kda/b200_plain`](kda/b200_plain) | NVIDIA B200 (sm_100a) | plain calls (benchmark track) | forward | 3.44× vs FlashKDA (Int21, H=64/96) |
 
 For an inference engine, use the **serving** kernel of your hardware. The `_plain` kernels are the earlier or
 benchmark-track versions on simpler interfaces, kept with their own results.
