@@ -2,7 +2,7 @@
 
 Kimi Delta Attention (chunked gated delta rule with per-channel gates) prefill for Kimi-K3 at TP8 (H = 12 heads,
 head dim 128, varlen batches), written in HIP C++. On the 10 production-shaped workloads below it is
-**3.0x faster than vLLM's hand-written ROCm KDA kernels** and **7.3x faster than flash-linear-attention's Triton
+**3.01x faster than vLLM's hand-written ROCm KDA kernels** (mean of three independent evals) and **7.3x faster than flash-linear-attention's Triton
 `chunk_kda`**, with output and final state within 5e-3 relative L2 of an fp32 reference.
 
 This is the phase-1 kernel on a simplified interface. The production version on vLLM's calling convention
